@@ -9,6 +9,7 @@ import cartRoutes from './routes/cart.routes';
 import orderRoutes from './routes/order.routes';
 import wishlistRoutes from './routes/wishlist.routes';
 import userRoutes from './routes/user.routes';
+import paymentRoutes from './routes/payment.routes';
 
 // Load environment variables
 dotenv.config();
@@ -40,6 +41,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 
 app.use('/api/user', userRoutes);
+app.use('/api/payment', paymentRoutes);
 // Not found middleware
 app.use(notFoundHandler);
 

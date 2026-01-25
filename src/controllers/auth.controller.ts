@@ -36,7 +36,7 @@ export const signup = asyncHandler(
     });
 
     res.status(HTTP_STATUS.CREATED).json(
-      sendSuccess('User registered successfully', { token, user })
+      sendSuccess('User registered successfully', { userToken: token, user })
     );
   }
 );
@@ -82,7 +82,7 @@ export const adminSignup = asyncHandler(
     });
 
     res.status(HTTP_STATUS.CREATED).json(
-      sendSuccess('Admin registered successfully', { token, user: admin })
+      sendSuccess('Admin registered successfully', { adminToken: token, user: admin })
     );
   }
 );
@@ -111,7 +111,7 @@ export const login = asyncHandler(
     });
 
     res.status(HTTP_STATUS.OK).json(
-      sendSuccess('Login successful', { token, user })
+      sendSuccess('Login successful', { userToken: token, user })
     );
   }
 );
@@ -146,7 +146,7 @@ export const adminLogin = asyncHandler(
     });
 
     res.status(HTTP_STATUS.OK).json(
-      sendSuccess('Admin login successful', { token, user })
+      sendSuccess('Admin login successful', { adminToken: token, user })
     );
   }
 );
