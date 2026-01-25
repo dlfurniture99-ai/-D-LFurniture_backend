@@ -1,8 +1,8 @@
-import express, { Express, Request, Response } from 'express';
+import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import connectDB from './config/db';
-import { errorHandler, notFoundHandler } from './middlewares/error.middleware';
+
 import authRoutes from './routes/auth.routes';
 import furnitureRoutes from './routes/furniture.routes';
 import cartRoutes from './routes/cart.routes';
@@ -11,65 +11,36 @@ import wishlistRoutes from './routes/wishlist.routes';
 import userRoutes from './routes/user.routes';
 import paymentRoutes from './routes/payment.routes';
 
-// Load environment variables
 dotenv.config();
 
-const app: Express = express();
-const PORT = process.env.PORT || 5000;
+const app = express();
 
-// Connect to MongoDB
+// DB connect (safe for serverless)
 connectDB();
 
-// Middleware
+// CORS (FIXED)
 app.use(cors({
   origin: [
-    'http://localhost:3000',
-    'http://localhost:5173',
-    'http://localhost:5000',
     'https://d-l-furniture-frontend.vercel.app'
   ],
-  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
 }));
+
+// 🔥 REQUIRED for preflight
+app.options('*', cors());
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health check endpoint
-app.get('/', (req: Request, res: Response) => {
-  res.json({
-    success: true,
-    message: '🚀 D&L Furniture API is running',
-  });
-});
-
-// API Routes
+// Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/furniture', furnitureRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/wishlist', wishlistRoutes);
-
 app.use('/api/user', userRoutes);
 app.use('/api/payment', paymentRoutes);
-// Not found middleware
-app.use(notFoundHandler);
-
-// Error handling middleware
-app.use(errorHandler);
-
-// Start server
-const server = app.listen(PORT, () => {
-  console.log(`✅ Server is running on port ${PORT}`);
-  console.log(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
-});
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err: Error) => {
-  console.error('❌ Unhandled Rejection:', err.message);
-  server.close(() => {
-    process.exit(1);
-  });
-});
 
 export default app;
