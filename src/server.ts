@@ -44,6 +44,15 @@ app.use((req, res, next) => {
 /* ===============================
    NORMAL CORS (LOCAL + PROD)
 ================================ */
+app.use(async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.use(
   cors({
     origin: [
@@ -64,7 +73,6 @@ app.use(express.urlencoded({ extended: true }));
 /* ===============================
    DB CONNECTION
 ================================ */
-connectDB();
 
 /* ===============================
    ROUTES
