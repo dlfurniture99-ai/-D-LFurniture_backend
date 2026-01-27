@@ -1,6 +1,8 @@
+import dotenv from 'dotenv';
+dotenv.config(); // Must be FIRST before any imports that use env vars
+
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import connectDB from './config/db';
 
 import authRoutes from './routes/auth.routes';
@@ -10,8 +12,7 @@ import orderRoutes from './routes/order.routes';
 import wishlistRoutes from './routes/wishlist.routes';
 import userRoutes from './routes/user.routes';
 import paymentRoutes from './routes/payment.routes';
-
-dotenv.config();
+import categoryRoutes from './routes/category.routes';
 
 const app = express();
 
@@ -21,7 +22,9 @@ connectDB();
 // CORS (FIXED)
 app.use(cors({
   origin: [
-    'https://d-l-furniture-frontend.vercel.app'
+    'https://d-l-furniture-frontend.vercel.app',
+    'http://localhost:3000',
+    'http://localhost:3001'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -42,5 +45,14 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/wishlist', wishlistRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/categories', categoryRoutes);
+
+// Start server
+const PORT = process.env.PORT || 5000;
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`✅ Server running on port ${PORT}`);
+  });
+}
 
 export default app;

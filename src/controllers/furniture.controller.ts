@@ -9,6 +9,9 @@ import {
   furnitureListSchema,
 } from '../validations/furniture.validation';
 import { AuthRequest } from '../middlewares/auth.middleware';
+import { CloudinaryRequest } from '../middlewares/upload.middleware';
+
+type FurnitureRequest = AuthRequest & CloudinaryRequest;
 
 export const getAllFurniture = asyncHandler(
   async (req: AuthRequest, res: Response) => {
@@ -90,14 +93,30 @@ export const getFurnitureById = asyncHandler(
     res.status(HTTP_STATUS.OK).json(sendSuccess('Furniture fetched', furniture));
   }
 );
-
+ 
 
 
 export const createFurniture = asyncHandler(
-  async (req: AuthRequest, res: Response) => {
-    const body = createFurnitureSchema.parse(req.body);
-    console.log('Creating furniture with data:', body);
-    const furniture = new Furniture(body);
+  async (req: FurnitureRequest, res: Response) => {
+    const { name, price, mrp, category, discount, stock, description } = req.body;
+    
+    console.log('Files received:', req.files);
+    console.log('Cloudinary URLs:', req.cloudinaryUrls);
+    
+    const furnitureData = {
+      name,
+      price: Number(price) || 0,
+      mrp: Number(mrp) || 0,
+      category,
+      discount: Number(discount) || 0,
+      stock: Number(stock) || 0,
+      description: description || '',
+      images: req.cloudinaryUrls || [],
+    };
+
+    console.log('Furniture data to save:', furnitureData);
+
+    const furniture = new Furniture(furnitureData);
     await furniture.save();
 
     res.status(HTTP_STATUS.CREATED).json(
@@ -107,11 +126,38 @@ export const createFurniture = asyncHandler(
 );
 
 export const updateFurniture = asyncHandler(
-  async (req: AuthRequest, res: Response) => {
-    const { id } = req.body;
-    const body = updateFurnitureSchema.parse(req.body);
+  async (req: FurnitureRequest, res: Response) => {
+    const id = req.query.id as string;
+    
+    if (!id) {
+      throw new AppError('Furniture ID is required', HTTP_STATUS.BAD_REQUEST);
+    }
 
-    const furniture = await Furniture.findByIdAndUpdate(id, body, {
+    const { name, price, mrp, category, discount, stock, description, existingImages } = req.body;
+
+    // Parse existing images from frontend
+    let images: string[] = [];
+    if (existingImages) {
+      images = Array.isArray(existingImages) ? existingImages : [existingImages];
+    }
+
+    // Add new uploaded images
+    if (req.cloudinaryUrls && req.cloudinaryUrls.length > 0) {
+      images = [...images, ...req.cloudinaryUrls];
+    }
+
+    const updateData = {
+      name,
+      price: Number(price) || 0,
+      mrp: Number(mrp) || 0,
+      category,
+      discount: Number(discount) || 0,
+      stock: Number(stock) || 0,
+      description: description || '',
+      images,
+    };
+
+    const furniture = await Furniture.findByIdAndUpdate(id, updateData, {
       new: true,
       runValidators: true,
     });

@@ -5,16 +5,10 @@ export interface IFurniture extends Document {
   price: number;
   mrp: number;
   category: string;
-  description?: string;
-  image?: string;
-  images?: string[];
-  discount?: number;
-  rating?: number;
-  reviews?: number;
-  badge?: string;
-  isBestSeller?: boolean;
-  emiText?: string;
-  stock?: number;
+  description: string;
+  images: string[];
+  discount: number;
+  stock: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -24,14 +18,17 @@ const furnitureSchema = new Schema<IFurniture>(
     name: {
       type: String,
       required: true,
+      trim: true,
     },
     price: {
       type: Number,
       required: true,
+      min: 0,
     },
     mrp: {
       type: Number,
       required: true,
+      min: 0,
     },
     category: {
       type: String,
@@ -40,9 +37,7 @@ const furnitureSchema = new Schema<IFurniture>(
     },
     description: {
       type: String,
-    },
-    image: {
-      type: String,
+      default: '',
     },
     images: [
       {
@@ -52,30 +47,13 @@ const furnitureSchema = new Schema<IFurniture>(
     discount: {
       type: Number,
       default: 0,
-    },
-    rating: {
-      type: Number,
-      default: 0,
       min: 0,
-      max: 5,
-    },
-    reviews: {
-      type: Number,
-      default: 0,
-    },
-    badge: {
-      type: String,
-    },
-    isBestSeller: {
-      type: Boolean,
-      default: false,
-    },
-    emiText: {
-      type: String,
+      max: 100,
     },
     stock: {
       type: Number,
       default: 0,
+      min: 0,
     },
   },
   { timestamps: true }
