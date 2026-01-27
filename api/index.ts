@@ -1,3 +1,3 @@
-import app from '../src/server';
+import { handler } from '../src/server';
 
-export default app;
+export default handler;

@@ -14,11 +14,11 @@ import userRoutes from "./routes/user.routes";
 import paymentRoutes from "./routes/payment.routes";
 import categoryRoutes from "./routes/category.routes";
 
+import serverless from "serverless-http";
+
 const app = express();
 
-/* ===============================
-   🔥 CORS CONFIGURATION
-================================ */
+/* CORS Configuration */
 const allowedOrigins = [
   "https://d-l-furniture-frontend.vercel.app",
   "http://localhost:3000",
@@ -28,7 +28,6 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps or curl)
       if (!origin) return callback(null, true);
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
@@ -42,18 +41,13 @@ app.use(
   })
 );
 
-// Handle preflight requests for all routes
 app.options("*", cors());
 
-/* ===============================
-   BODY PARSERS
-================================ */
+/* Body parsers */
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
-/* ===============================
-   DATABASE CONNECTION
-================================ */
+/* Connect to DB middleware */
 app.use(async (req, res, next) => {
   try {
     await connectDB();
@@ -63,9 +57,7 @@ app.use(async (req, res, next) => {
   }
 });
 
-/* ===============================
-   ROUTES
-================================ */
+/* Routes */
 app.use("/api/auth", authRoutes);
 app.use("/api/furniture", furnitureRoutes);
 app.use("/api/cart", cartRoutes);
@@ -75,21 +67,10 @@ app.use("/api/user", userRoutes);
 app.use("/api/payment", paymentRoutes);
 app.use("/api/categories", categoryRoutes);
 
-/* ===============================
-   HEALTH CHECK
-================================ */
+/* Health check */
 app.get("/", (req, res) => {
   res.status(200).json({ message: "API is running 🚀" });
 });
 
-/* ===============================
-   LOCAL DEV SERVER
-================================ */
-const PORT = process.env.PORT || 5000;
-if (process.env.NODE_ENV !== "production") {
-  app.listen(PORT, () => {
-    console.log(`✅ Server running on port ${PORT}`);
-  });
-}
-
-export default app;
+/* Export the serverless handler */
+export const handler = serverless(app);
