@@ -17,32 +17,42 @@ import categoryRoutes from "./routes/category.routes";
 const app = express();
 
 /* ===============================
-   🔥 VERCEL CORS FIX (REQUIRED)
+   🔥 CORS CONFIGURATION
 ================================ */
-app.use((req, res, next) => {
-  res.setHeader(
-    "Access-Control-Allow-Origin",
-    "https://d-l-furniture-frontend.vercel.app"
-  );
-  res.setHeader(
-    "Access-Control-Allow-Methods",
-    "GET,POST,PUT,DELETE,OPTIONS"
-  );
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization"
-  );
-  res.setHeader("Access-Control-Allow-Credentials", "true");
+const allowedOrigins = [
+  "https://d-l-furniture-frontend.vercel.app",
+  "http://localhost:3000",
+  "http://localhost:3001",
+];
 
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps or curl)
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      } else {
+        return callback(new Error("CORS not allowed"), false);
+      }
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
-  next();
-});
+// Handle preflight requests for all routes
+app.options("*", cors());
 
 /* ===============================
-   NORMAL CORS (LOCAL + PROD)
+   BODY PARSERS
+================================ */
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true }));
+
+/* ===============================
+   DATABASE CONNECTION
 ================================ */
 app.use(async (req, res, next) => {
   try {
@@ -52,27 +62,6 @@ app.use(async (req, res, next) => {
     next(error);
   }
 });
-
-app.use(
-  cors({
-    origin: [
-      "https://d-l-furniture-frontend.vercel.app",
-      "http://localhost:3000",
-      "http://localhost:3001",
-    ],
-    credentials: true,
-  })
-);
-
-/* ===============================
-   BODY PARSERS
-================================ */
-app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ extended: true }));
-
-/* ===============================
-   DB CONNECTION
-================================ */
 
 /* ===============================
    ROUTES
@@ -98,9 +87,9 @@ app.get("/", (req, res) => {
 ================================ */
 const PORT = process.env.PORT || 5000;
 if (process.env.NODE_ENV !== "production") {
-  app.listen(PORT, () =>
-    console.log(`✅ Server running on port ${PORT}`)
-  );
+  app.listen(PORT, () => {
+    console.log(`✅ Server running on port ${PORT}`);
+  });
 }
 
 export default app;

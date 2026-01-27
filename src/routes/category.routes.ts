@@ -12,10 +12,10 @@ import { authMiddleware } from '../middlewares/auth.middleware';
 const router = Router();
 
 // Public routes
-router.get('/public-category', getAllCategories);
-router.get('/public-category/:id', getCategoryById);
-router.get('/public-category/slug/:slug', getCategoryBySlug);
-
+router.get('/', getAllCategories);
+router.get('/:id', getCategoryById);
+router.get('/slug/:slug', getCategoryBySlug);
+ 
 // Admin routes
 router.post('/create-category', authMiddleware, createCategory);
 router.put('/edit-category/:id', authMiddleware, updateCategory);
