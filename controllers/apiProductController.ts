@@ -13,7 +13,7 @@ function generateSlug(productName: string): string {
 }
 
 // Get all products
-export const getAllProducts = async (req: Request, res: Response) => {
+export const getAllProducts = async (req: Request, res: Response): Promise<any> => {
   try {
     const products = await productModel.find({});
     res.json({
@@ -31,7 +31,7 @@ export const getAllProducts = async (req: Request, res: Response) => {
 };
 
 // Get product by slug
-export const getProductBySlug = async (req: Request, res: Response) => {
+export const getProductBySlug = async (req: Request, res: Response): Promise<any> => {
   try {
     const { slug } = req.params;
     const product = await productModel.findOne({ productSlug: slug });
@@ -58,7 +58,7 @@ export const getProductBySlug = async (req: Request, res: Response) => {
 };
 
 // Get product by ID
-export const getProductById = async (req: Request, res: Response) => {
+export const getProductById = async (req: Request, res: Response): Promise<any> => {
   try {
     const { id } = req.params;
     const product = await productModel.findById(id);
@@ -85,7 +85,7 @@ export const getProductById = async (req: Request, res: Response) => {
 };
 
 // Create product
-export const createProduct = async (req: Request, res: Response) => {
+export const createProduct = async (req: Request, res: Response): Promise<any> => {
   try {
     const { productName, productImage, productPrice, productDiscount, productDescription, productReview, productType } = req.body;
 
@@ -123,7 +123,7 @@ export const createProduct = async (req: Request, res: Response) => {
 };
 
 // Update product
-export const updateProduct = async (req: Request, res: Response) => {
+export const updateProduct = async (req: Request, res: Response): Promise<any> => {
   try {
     const { id } = req.params;
     const updates = req.body;
@@ -152,7 +152,7 @@ export const updateProduct = async (req: Request, res: Response) => {
 };
 
 // Delete product
-export const deleteProduct = async (req: Request, res: Response) => {
+export const deleteProduct = async (req: Request, res: Response): Promise<any> => {
   try {
     const { id } = req.params;
     const product = await productModel.findByIdAndDelete(id);

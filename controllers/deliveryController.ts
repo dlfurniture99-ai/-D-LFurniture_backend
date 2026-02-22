@@ -4,7 +4,7 @@ import User from '../models/User';
 import emailService from '../services/emailService';
 
 // Generate OTP for delivery
-export const generateDeliveryOtp = async (req: any, res: Response) => {
+export const generateDeliveryOtp = async (req: any, res: Response): Promise<any> => {
   try {
     const { bookingId } = req.params;
     
@@ -56,7 +56,7 @@ export const generateDeliveryOtp = async (req: any, res: Response) => {
 };
 
 // Get booking details for delivery (delivery boy endpoint)
-export const getBookingForDelivery = async (req: any, res: Response) => {
+export const getBookingForDelivery = async (req: any, res: Response): Promise<any> => {
   try {
     const { bookingId } = req.params;
 
@@ -100,7 +100,7 @@ export const getBookingForDelivery = async (req: any, res: Response) => {
 };
 
 // Verify OTP and confirm delivery
-export const confirmDeliveryWithOtp = async (req: any, res: Response) => {
+export const confirmDeliveryWithOtp = async (req: any, res: Response): Promise<any> => {
   try {
     const { bookingId } = req.params;
     const { otp, deliveryBoyName, deliveryBoyPhone } = req.body;
@@ -170,7 +170,7 @@ export const confirmDeliveryWithOtp = async (req: any, res: Response) => {
 };
 
 // Delivery boy searches booking by bookingId
-export const searchBooking = async (req: any, res: Response) => {
+export const searchBooking = async (req: any, res: Response): Promise<any> => {
   try {
     const { searchTerm } = req.query;
 

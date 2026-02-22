@@ -4,9 +4,9 @@ import Product from '../models/Product';
 
 export const favoriteController = {
   /**
-   * Get all user favorites
-   */
-  async getAll(req: any, res: Response): Promise<void> {
+    * Get all user favorites
+    */
+  async getAll(req: any, res: Response): Promise<any> {
     try {
       const user = await User.findById(req.userId).populate('favorites');
       if (!user) {
@@ -20,9 +20,9 @@ export const favoriteController = {
   },
 
   /**
-   * Add product to favorites
-   */
-  async add(req: any, res: Response): Promise<void> {
+    * Add product to favorites
+    */
+  async add(req: any, res: Response): Promise<any> {
     try {
       const { productId } = req.params;
 
@@ -47,9 +47,9 @@ export const favoriteController = {
   },
 
   /**
-   * Remove product from favorites
-   */
-  async remove(req: any, res: Response): Promise<void> {
+    * Remove product from favorites
+    */
+  async remove(req: any, res: Response): Promise<any> {
     try {
       const { productId } = req.params;
 
@@ -67,9 +67,9 @@ export const favoriteController = {
   },
 
   /**
-   * Check if product is in favorites
-   */
-  async checkIsFavorite(req: any, res: Response): Promise<void> {
+    * Check if product is in favorites
+    */
+  async checkIsFavorite(req: any, res: Response): Promise<any> {
     try {
       const user = await User.findById(req.userId);
       if (!user) {

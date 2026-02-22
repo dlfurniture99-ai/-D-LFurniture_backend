@@ -11,6 +11,8 @@ export interface IAdmin extends Document {
   isActive: boolean;
   profileImage: string;
   googleId?: string;
+  otp?: string | null;
+  otpExpires?: Date | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -65,6 +67,14 @@ const AdminSchema = new Schema<IAdmin>(
       type: String,
       default: null,
       sparse: true
+    },
+    otp: {
+      type: String,
+      default: null
+    },
+    otpExpires: {
+      type: Date,
+      default: null
     }
   },
   { timestamps: true }

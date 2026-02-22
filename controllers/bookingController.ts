@@ -29,9 +29,9 @@ async function generateBookingId() {
 
 export const bookingController = {
   /**
-   * Create a new booking
-   */
-  async create(req: any, res: Response): Promise<void> {
+    * Create a new booking
+    */
+  async create(req: any, res: Response): Promise<any> {
     try {
       const { productId, quantity, shippingAddress } = req.body;
       const userId = req.userId;
@@ -100,7 +100,7 @@ export const bookingController = {
   /**
    * Get all user bookings
    */
-  async getUserBookings(req: any, res: Response): Promise<void> {
+  async getUserBookings(req: any, res: Response): Promise<any> {
     try {
       const bookings = await Booking.find({ userId: req.userId })
         .populate('productId')
@@ -116,7 +116,7 @@ export const bookingController = {
   /**
    * Get single booking details
    */
-  async getById(req: any, res: Response): Promise<void> {
+  async getById(req: any, res: Response): Promise<any> {
     try {
       const booking = await Booking.findById(req.params.id)
         .populate('productId')
@@ -141,7 +141,7 @@ export const bookingController = {
   /**
    * Get all bookings (admin only)
    */
-  async getAllAdmin(req: Request, res: Response): Promise<void> {
+  async getAllAdmin(req: Request, res: Response): Promise<any> {
     try {
       const { status, page = 1, limit = 10 } = req.query;
       const filter: any = {};
@@ -178,7 +178,7 @@ export const bookingController = {
   /**
    * Update booking status (admin only)
    */
-  async updateStatus(req: any, res: Response): Promise<void> {
+  async updateStatus(req: any, res: Response): Promise<any> {
     try {
       const { status, paymentStatus } = req.body;
       const booking = await Booking.findByIdAndUpdate(
@@ -211,7 +211,7 @@ export const bookingController = {
   /**
    * Cancel booking (admin only)
    */
-  async cancel(req: Request, res: Response): Promise<void> {
+  async cancel(req: Request, res: Response): Promise<any> {
     try {
       const booking = await Booking.findByIdAndUpdate(
         req.params.id,
@@ -240,7 +240,7 @@ export const bookingController = {
   /**
    * Get booking by bookingId (for public/delivery boys)
    */
-  async getByBookingId(req: Request, res: Response): Promise<void> {
+  async getByBookingId(req: Request, res: Response): Promise<any> {
     try {
       const { bookingId } = req.query;
 

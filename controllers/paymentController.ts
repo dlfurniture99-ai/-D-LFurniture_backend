@@ -93,7 +93,7 @@ class PaymentService {
 
       return {
         orderId: order.id,
-        amount: order.amount,
+        amount: Number(order.amount),
         currency: order.currency
       };
     } catch (error: any) {
@@ -171,7 +171,7 @@ class PaymentService {
       return {
         refundId: refund.id,
         status: refund.status,
-        amount: refund.amount / 100
+        amount: (refund.amount || 0) / 100
       };
     } catch (error: any) {
       console.error('❌ Refund failed:', error);
@@ -269,7 +269,7 @@ class PaymentService {
    */
   private async generateBookingId(): Promise<string> {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let id: string;
+    let id = 'BK-';
     let exists = true;
     
     while (exists) {

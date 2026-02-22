@@ -115,15 +115,15 @@ export const authController = {
         return;
       }
 
-      // Check if delivery boy is verified
-      if (user.role === 'deliveryBoy' && !user.isVerified) {
-        res.status(403).json({
-          success: false,
-          message: 'Your email has not been verified yet. Please check your email for the verification OTP.',
-          needsEmailVerification: true
-        });
-        return;
-      }
+      // Check if customer email is verified (optional verification check)
+      // if (user.role === 'customer' && !user.isVerified) {
+      //   res.status(403).json({
+      //     success: false,
+      //     message: 'Your email has not been verified yet. Please check your email for the verification OTP.',
+      //     needsEmailVerification: true
+      //   });
+      //   return;
+      // }
 
       // Generate JWT token
       const token = jwt.sign(
