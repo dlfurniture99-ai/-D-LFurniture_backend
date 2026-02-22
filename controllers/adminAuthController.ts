@@ -45,6 +45,7 @@ export const adminAuthController = {
            name: 'Admin',
            email: adminEmail,
            password: 'passwordless-admin',
+           phone: '+91-0000000000',
            role: 'admin',
            isVerified: true
          });
