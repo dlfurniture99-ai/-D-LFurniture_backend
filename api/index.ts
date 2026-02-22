@@ -25,7 +25,8 @@ const app: Express = express();
 const allowedOrigins = [
   'http://localhost:3000', // Local development
   'http://localhost:5000', // Local development (self)
-  process.env.FRONTEND_URL // Production frontend
+  'https://dandlfurnitech.vercel.app', // Production frontend
+  process.env.FRONTEND_URL // Production frontend from env
 ].filter(Boolean);
 
 app.use(cors({

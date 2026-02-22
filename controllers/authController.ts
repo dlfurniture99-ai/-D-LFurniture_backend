@@ -208,6 +208,7 @@ export const authController = {
           password: randomPassword,
           phone: '',
           address: '',
+          role: 'customer',
           googleId: payload.sub,
           isVerified: true,
         });

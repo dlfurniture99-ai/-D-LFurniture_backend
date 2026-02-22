@@ -26,11 +26,13 @@ export const adminAuthController = {
 
       // Check if email matches admin email in .env
       const adminEmail = process.env.ADMIN_EMAIL;
+      
       if (!adminEmail) {
         console.error('ADMIN_EMAIL not set in .env');
         res.status(500).json({ success: false, message: 'Server configuration error' });
         return;
       }
+
 
       if (email.toLowerCase() !== adminEmail.toLowerCase()) {
         res.status(403).json({ success: false, message: 'Not authorized as admin' });
