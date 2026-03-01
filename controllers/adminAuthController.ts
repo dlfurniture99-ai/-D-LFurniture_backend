@@ -26,9 +26,8 @@ export const adminAuthController = {
 
       // Check if email matches admin email in .env
       const adminEmail = process.env.ADMIN_EMAIL;
-      
+
       if (!adminEmail) {
-        console.error('ADMIN_EMAIL not set in .env');
         res.status(500).json({ success: false, message: 'Server configuration error' });
         return;
       }
@@ -40,22 +39,22 @@ export const adminAuthController = {
       }
 
       // Find or create admin user
-       let admin = await Admin.findOne({ email: adminEmail });
+      let admin = await Admin.findOne({ email: adminEmail });
 
-       if (!admin) {
-         admin = new Admin({
-           name: 'Admin',
-           email: adminEmail,
-           password: 'passwordless-admin',
-           phone: '+91-0000000000',
-           role: 'admin',
-           isVerified: true
-         });
-       } else {
-         // Ensure admin user always has admin role
-         admin.role = 'admin';
-         admin.isVerified = true;
-       }
+      if (!admin) {
+        admin = new Admin({
+          name: 'Admin',
+          email: adminEmail,
+          password: 'passwordless-admin',
+          phone: '+91-0000000000',
+          role: 'admin',
+          isVerified: true
+        });
+      } else {
+        // Ensure admin user always has admin role
+        admin.role = 'admin';
+        admin.isVerified = true;
+      }
 
       // Generate OTP
       const otp = generateOTP();

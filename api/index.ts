@@ -1,3 +1,4 @@
+
 import express, { Express } from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
@@ -26,6 +27,8 @@ const allowedOrigins = [
   'http://localhost:3000', // Local development
   'http://localhost:5000', // Local development (self)
   'https://dandlfurnitech.vercel.app', // Production frontend
+  'https://thewoodenspace.com', // Custom domain
+  'https://www.thewoodenspace.com', // Custom domain with www
   process.env.FRONTEND_URL // Production frontend from env
 ].filter(Boolean);
 
@@ -82,14 +85,21 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 // Database Connection
-mongoose.connect(process.env.MONGODB_URI || '', {
+const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://dlfurniture99_db_user:fDdaaPnkkQWXdDj2@cluster0.hisi1qq.mongodb.net';
+
+mongoose.connect(mongoUri, {
   dbName: "dandldb",
+  retryWrites: true,
+  w: 'majority',
+  serverSelectionTimeoutMS: 10000,
+  connectTimeoutMS: 10000,
+  socketTimeoutMS: 45000,
 })
   .then(() => {
     console.log('✓ Connected to MongoDB');
   })
-  .catch((err) => {
-    console.error('✗ MongoDB connection failed:', err);
+  .catch((err: any) => {
+    console.error('✗ MongoDB connection failed:', err.message);
     process.exit(1);
   });
 
