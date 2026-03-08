@@ -297,24 +297,28 @@ export const addProductReview = async (req: any, res: Response) => {
       return;
     }
 
+    const normalizedRating = Number(rating);
+    const normalizedComment = typeof comment === 'string' ? comment.trim() : '';
+
     // Validate rating and comment
-    if (!rating || !comment || !comment.trim()) {
-      res.status(400).json({ success: false, message: 'Rating and comment are required' });
+    if (!Number.isFinite(normalizedRating) || normalizedRating < 1 || normalizedRating > 5 || !normalizedComment) {
+      res.status(400).json({ success: false, message: 'Rating (1-5) and comment are required' });
       return;
     }
 
     product.reviews.push({
       userId: req.userId,
-      userName: req.user?.name || 'Anonymous',
-      rating: parseInt(rating),
-      comment: comment.trim(),
+      userName: req.user?.name || req.user?.fullName || req.user?.email || 'Anonymous',
+      rating: Math.round(normalizedRating),
+      comment: normalizedComment,
       createdAt: new Date()
     });
 
     const avgRating = product.reviews.reduce((sum, r) => sum + r.rating, 0) / product.reviews.length;
-    product.rating = avgRating;
+    product.rating = Number(avgRating.toFixed(1));
 
-    await product.save();
+    // Keep review flow compatible with legacy products that may miss newer required fields.
+    await product.save({ validateBeforeSave: false });
     console.log('Review added successfully');
     res.json({ success: true, message: 'Review added successfully', product });
     } catch (error) {

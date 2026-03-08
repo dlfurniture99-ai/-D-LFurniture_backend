@@ -95,7 +95,7 @@ export const userLoginController = async (req: Request, res: Response): Promise<
 
     res.status(200).json({
       success: true,
-      message: 'Login successful! Welcome to D&L Furnitech',
+      message: 'Login successful! Welcome to The Wooden Space',
       data: {
         user: userResponse,
         token: token,

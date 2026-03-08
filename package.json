@@ -1,7 +1,7 @@
 {
   "name": "furniture-api",
   "version": "1.0.0",
-  "description": "D&L Furnitech - Server",
+  "description": "The Wooden Space - Server",
   "main": "dist/api/index.js",
   "scripts": {
     "dev": "nodemon --exec ts-node --project tsconfig.json api/index.ts",
@@ -18,7 +18,7 @@
     "ecommerce",
     "api"
   ],
-  "author": "D&L Furnitech",
+  "author": "The Wooden Space",
   "license": "ISC",
   "dependencies": {
     "@types/axios": "^0.9.36",

@@ -151,7 +151,7 @@ export const userRegisterController = async (req: Request, res: Response): Promi
 
     res.status(201).json({
       success: true,
-      message: 'Registration successful! Welcome to D&L Furnitech',
+      message: 'Registration successful! Welcome to The Wooden Space',
       data: {
         user: userResponse,
         token: token,

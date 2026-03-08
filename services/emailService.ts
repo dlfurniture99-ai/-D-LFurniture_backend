@@ -62,11 +62,11 @@ class EmailService {
     const html = `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #fbbf24 0%, #8b5cf6 100%); padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
-          <h1 style="color: white; margin: 0;">Welcome to D&L Furnitech</h1>
+          <h1 style="color: white; margin: 0;">Welcome to The Wooden Space</h1>
         </div>
         <div style="padding: 30px; background-color: #f9f9f9;">
           <p>Hello,</p>
-          <p>Thank you for registering with D&L Furnitech. Please verify your email to activate your account.</p>
+          <p>Thank you for registering with The Wooden Space. Please verify your email to activate your account.</p>
           <a href="${verificationUrl}" style="display: inline-block; background-color: #fbbf24; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold;">
             Verify Email
           </a>
@@ -78,7 +78,7 @@ class EmailService {
 
     await this.sendEmail({
       to: email,
-      subject: 'Verify Your Email - D&L Furnitech',
+      subject: 'Verify Your Email - The Wooden Space',
       html
     });
   }
@@ -135,7 +135,7 @@ class EmailService {
 
     await this.sendEmail({
       to: email,
-      subject: 'Password Reset Request - D&L Furnitech',
+      subject: 'Password Reset Request - The Wooden Space',
       html
     });
   }
@@ -188,7 +188,7 @@ class EmailService {
 
     await this.sendEmail({
       to: email,
-      subject: 'Admin Login OTP - D&L Furnitech',
+      subject: 'Admin Login OTP - The Wooden Space',
       html
     });
   }
@@ -293,7 +293,7 @@ class EmailService {
         </div>
         <div style="padding: 30px; background-color: #f9f9f9;">
           <p>Hello ${deliveryBoyName},</p>
-          <p>Welcome to D&L Furnitech Delivery Network! Your account has been created by the admin.</p>
+          <p>Welcome to The Wooden Space Delivery Network! Your account has been created by the admin.</p>
           
           <div style="background: white; padding: 20px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #fbbf24;">
             <p><strong>Please verify your email to complete your registration.</strong></p>
@@ -340,7 +340,7 @@ class EmailService {
 
     await this.sendEmail({
       to: email,
-      subject: 'Verify Your Email - Delivery Boy Account - D&L Furnitech',
+      subject: 'Verify Your Email - Delivery Boy Account - The Wooden Space',
       html
     });
   }
@@ -380,7 +380,7 @@ class EmailService {
 
     await this.sendEmail({
       to: email,
-      subject: 'Delivery Boy Login OTP - D&L Furnitech',
+      subject: 'Delivery Boy Login OTP - The Wooden Space',
       html
     });
   }
@@ -428,7 +428,7 @@ class EmailService {
 
     await this.sendEmail({
       to: customerEmail,
-      subject: 'Your Delivery OTP - D&L Furnitech',
+      subject: 'Your Delivery OTP - The Wooden Space',
       html
     });
   }
