@@ -13,7 +13,7 @@ const generateOTP = (): string => {
 export const adminAuthController = {
   /**
    * Request admin login via OTP
-   * Admin email must be in ADMIN_EMAIL env variable
+   * Only emails with role: 'admin' in DB are allowed
    */
   async requestOTP(req: Request, res: Response): Promise<void> {
     try {
@@ -24,36 +24,16 @@ export const adminAuthController = {
         return;
       }
 
-      // Check if email matches admin email in .env
-      // const adminEmail = process.env.ADMIN_EMAIL;
-
-      // if (!adminEmail) {
-      //   res.status(500).json({ success: false, message: 'Server configuration error' });
-      //   return;
-      // }
-
-
-      // if (email.toLowerCase() !== adminEmail.toLowerCase()) {
-      //   res.status(403).json({ success: false, message: 'Not authorized as admin' });
-      //   return;
-      // }
-
-      // Find or create admin user
-      let admin = await Admin.findOne({ email: adminEmail });
+      // Find admin directly from DB by the entered email
+      const admin = await Admin.findOne({
+        email: email.toLowerCase(),
+        role: 'admin'
+      });
 
       if (!admin) {
-        admin = new Admin({
-          name: 'Admin',
-          email: adminEmail,
-          password: 'passwordless-admin',
-          phone: '+91-0000000000',
-          role: 'admin',
-          isVerified: true
-        });
-      } else {
-        // Ensure admin user always has admin role
-        admin.role = 'admin';
-        admin.isVerified = true;
+        // Don't reveal whether email exists or not (security best practice)
+        res.status(403).json({ success: false, message: 'Not authorized as admin' });
+        return;
       }
 
       // Generate OTP
@@ -63,11 +43,12 @@ export const adminAuthController = {
       // Save OTP to admin
       admin.otp = otp;
       admin.otpExpires = otpExpires;
+      admin.isVerified = true;
       await admin.save();
 
-      // Send OTP via email
+      // Send OTP to the email that exists in DB
       try {
-        await emailService.sendOTP(adminEmail, otp);
+        await emailService.sendOTP(admin.email, otp);
         res.status(200).json({
           success: true,
           message: 'OTP sent to admin email'
@@ -76,6 +57,7 @@ export const adminAuthController = {
         console.error('Failed to send OTP email:', emailError);
         res.status(500).json({ success: false, message: 'Failed to send OTP' });
       }
+
     } catch (error) {
       console.error('Request OTP error:', error);
       res.status(500).json({ success: false, message: 'Failed to request OTP' });
@@ -94,17 +76,14 @@ export const adminAuthController = {
         return;
       }
 
-      // Check admin email
-      const adminEmail = process.env.ADMIN_EMAIL;
-      if (email.toLowerCase() !== adminEmail?.toLowerCase()) {
-        res.status(403).json({ success: false, message: 'Not authorized as admin' });
-        return;
-      }
+      // Find admin from DB by entered email
+      const admin = await Admin.findOne({
+        email: email.toLowerCase(),
+        role: 'admin'
+      }).select('+otp +otpExpires');
 
-      // Find admin
-      const admin = await Admin.findOne({ email: adminEmail }).select('+otp +otpExpires');
       if (!admin) {
-        res.status(401).json({ success: false, message: 'Admin user not found' });
+        res.status(403).json({ success: false, message: 'Not authorized as admin' });
         return;
       }
 
@@ -152,6 +131,7 @@ export const adminAuthController = {
           role: admin.role
         }
       });
+
     } catch (error) {
       console.error('Verify OTP error:', error);
       res.status(500).json({ success: false, message: 'OTP verification failed' });
