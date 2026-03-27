@@ -25,18 +25,18 @@ export const adminAuthController = {
       }
 
       // Check if email matches admin email in .env
-      const adminEmail = process.env.ADMIN_EMAIL;
+      // const adminEmail = process.env.ADMIN_EMAIL;
 
-      if (!adminEmail) {
-        res.status(500).json({ success: false, message: 'Server configuration error' });
-        return;
-      }
+      // if (!adminEmail) {
+      //   res.status(500).json({ success: false, message: 'Server configuration error' });
+      //   return;
+      // }
 
 
-      if (email.toLowerCase() !== adminEmail.toLowerCase()) {
-        res.status(403).json({ success: false, message: 'Not authorized as admin' });
-        return;
-      }
+      // if (email.toLowerCase() !== adminEmail.toLowerCase()) {
+      //   res.status(403).json({ success: false, message: 'Not authorized as admin' });
+      //   return;
+      // }
 
       // Find or create admin user
       let admin = await Admin.findOne({ email: adminEmail });
