@@ -8,6 +8,18 @@ import emailService from '../services/emailService';
 
 const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
+const buildAuthCookieOptions = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    domain: isProduction ? process.env.COOKIE_DOMAIN || undefined : undefined,
+  };
+};
+
 export const authController = {
   /**
    * Register a new user
@@ -64,13 +76,7 @@ export const authController = {
       });
 
       // Set HTTP-only cookie with JWT token (Production-ready)
-      res.cookie('authToken', token, {
-        httpOnly: true,
-        secure: true, // Always use HTTPS in production (Vercel enforces this)
-        sameSite: 'none', // Required for cross-domain cookies
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        domain: process.env.COOKIE_DOMAIN || undefined
-      });
+      res.cookie('authToken', token, buildAuthCookieOptions());
 
       res.status(201).json({
         success: true,
@@ -80,7 +86,8 @@ export const authController = {
           name: newUser.name,
           email: newUser.email,
           role: newUser.role
-        }
+        },
+        token
       });
     } catch (error) {
       console.error('Registration error:', error);
@@ -133,13 +140,7 @@ export const authController = {
       );
 
       // Set HTTP-only cookie with JWT token (Production-ready)
-      res.cookie('authToken', token, {
-        httpOnly: true,
-        secure: true, // Always use HTTPS in production (Vercel enforces this)
-        sameSite: 'none', // Required for cross-domain cookies
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-        domain: process.env.COOKIE_DOMAIN || undefined
-      });
+      res.cookie('authToken', token, buildAuthCookieOptions());
 
       res.status(200).json({
         success: true,
@@ -149,7 +150,8 @@ export const authController = {
           name: user.name,
           email: user.email,
           role: user.role
-        }
+        },
+        token
       });
     } catch (error) {
       console.error('Login error:', error);
@@ -228,12 +230,7 @@ export const authController = {
       );
 
       // Set HTTP-only cookie with JWT token
-      res.cookie('authToken', jwtToken, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-      });
+      res.cookie('authToken', jwtToken, buildAuthCookieOptions());
 
       res.status(200).json({
         success: true,
@@ -243,7 +240,8 @@ export const authController = {
           name: user.name,
           email: user.email,
           role: user.role
-        }
+        },
+        token: jwtToken
       });
     } catch (error: any) {
       console.error('Google login error:', error?.message || error);
@@ -315,10 +313,8 @@ export const authController = {
     try {
       // Clear the authentication cookie (Production-ready)
       res.clearCookie('authToken', {
-        httpOnly: true,
-        secure: true, // Always use HTTPS in production (Vercel enforces this)
-        sameSite: 'none', // Must match the cookie settings
-        domain: process.env.COOKIE_DOMAIN || undefined
+        ...buildAuthCookieOptions(),
+        maxAge: undefined
       });
 
       res.status(200).json({
@@ -452,12 +448,7 @@ export const authController = {
       );
 
       // Set HTTP-only cookie
-      res.cookie('authToken', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-      });
+      res.cookie('authToken', token, buildAuthCookieOptions());
 
       res.status(200).json({
         success: true,

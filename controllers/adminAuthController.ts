@@ -3,6 +3,18 @@ import jwt from 'jsonwebtoken';
 import Admin from '../models/Admin';
 import emailService from '../services/emailService';
 
+const buildAuthCookieOptions = () => {
+  const isProduction = process.env.NODE_ENV === 'production';
+
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    domain: isProduction ? process.env.COOKIE_DOMAIN || undefined : undefined,
+  };
+};
+
 /**
  * Generate a 6-digit OTP
  */
@@ -114,12 +126,7 @@ export const adminAuthController = {
       );
 
       // Set HTTP-only cookie with JWT token
-      res.cookie('authToken', token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-      });
+      res.cookie('authToken', token, buildAuthCookieOptions());
 
       res.status(200).json({
         success: true,
@@ -129,7 +136,8 @@ export const adminAuthController = {
           name: admin.name,
           email: admin.email,
           role: admin.role
-        }
+        },
+        token
       });
 
     } catch (error) {
