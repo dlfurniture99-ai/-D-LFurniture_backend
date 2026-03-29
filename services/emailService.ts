@@ -14,17 +14,30 @@ class EmailService {
   private transporter: nodemailer.Transporter;
 
   constructor() {
-    const mailUser = process.env.MAIL_USER;
-    const mailPass = process.env.MAIL_PASS;
+    const mailUser =
+      process.env.MAIL_USER ||
+      process.env.EMAIL_USER ||
+      process.env.EMAIL_FROM ||
+      undefined;
+    const mailPass =
+      process.env.MAIL_PASS ||
+      process.env.EMAIL_PASS ||
+      process.env.EMAIL_PASSWORD ||
+      undefined;
+
+    if (!mailUser) {
+      console.warn('⚠️  WARNING: MAIL_USER is not set in .env file. Email sending will fail.');
+      console.warn('Please add: MAIL_USER=your-email@gmail.com');
+    }
 
     if (!mailPass) {
       console.warn('⚠️  WARNING: MAIL_PASS is not set in .env file. Email sending will fail.');
       console.warn('Please add: MAIL_PASS=your-16-character-app-password');
     }
 
-    const port = parseInt(process.env.MAIL_PORT || '587');
+    const port = parseInt(process.env.MAIL_PORT || process.env.EMAIL_PORT || '587');
     this.transporter = nodemailer.createTransport({
-      host: process.env.EMAIL_SERVICE || 'smtp.gmail.com',
+      host: process.env.EMAIL_SERVICE || process.env.SMTP_HOST || 'smtp.gmail.com',
       port: port,
       secure: port === 465, // true for 465 (SSL), false for 587 (TLS)
       auth: {
@@ -35,11 +48,21 @@ class EmailService {
   }
 
   async sendEmail(options: EmailOptions): Promise<void> {
-    // Skip email in development if credentials not configured
-    if (!process.env.MAIL_PASS) {
-      console.log(`[EMAIL MOCK] Would send email to: ${options.to}`);
-      console.log(`[EMAIL MOCK] Subject: ${options.subject}`);
-      return;
+    const configuredMailUser =
+      process.env.MAIL_USER ||
+      process.env.EMAIL_USER ||
+      process.env.EMAIL_FROM;
+    const configuredMailPass =
+      process.env.MAIL_PASS ||
+      process.env.EMAIL_PASS ||
+      process.env.EMAIL_PASSWORD;
+
+    // Do not silently mock admin/user emails when SMTP credentials are missing.
+    // Fail fast so the API returns a real error instead of pretending the email was sent.
+    if (!configuredMailUser || !configuredMailPass) {
+      throw new Error(
+        'Email service is not configured. Set MAIL_USER and MAIL_PASS in backend/.env'
+      );
     }
 
     try {

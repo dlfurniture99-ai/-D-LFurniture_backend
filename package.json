@@ -11,7 +11,8 @@
     "prod": "npm run build && npm run start",
     "test": "jest",
     "lint": "eslint api middleware models routes --ext .ts",
-    "lint:fix": "eslint api middleware models routes --ext .ts --fix"
+    "lint:fix": "eslint api middleware models routes --ext .ts --fix",
+    "seed:furniture": "ts-node --project tsconfig.json scripts/seedFurnitureProducts.ts"
   },
   "keywords": [
     "furniture",

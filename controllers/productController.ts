@@ -2,36 +2,102 @@ import { Request, Response } from 'express';
 import Product from '../models/Product';
 import { uploadImageFromDataUrl, uploadMultipleImagesFromDataUrls } from '../services/cloudinaryService';
 
+const CATEGORY_ALIASES: Record<string, string> = {
+  sofas: 'Sofas & Couches',
+  'sofas-couches': 'Sofas & Couches',
+  chairs: 'Chairs & Stools',
+  'chairs-stools': 'Chairs & Stools',
+  beds: 'Beds & Mattresses',
+  'beds-mattresses': 'Beds & Mattresses',
+  tables: 'Desks & Tables',
+  desks: 'Desks & Tables',
+  'desks-tables': 'Desks & Tables',
+  storage: 'Storage & Cabinets',
+  cabinets: 'Storage & Cabinets',
+  'storage-cabinets': 'Storage & Cabinets',
+  shelving: 'Shelving & Units',
+  'shelving-units': 'Shelving & Units',
+  outdoor: 'Outdoor Furniture',
+  'outdoor-furniture': 'Outdoor Furniture',
+  bedroom: 'Bedroom Furniture',
+  'bedroom-furniture': 'Bedroom Furniture',
+  dining: 'Dining Furniture',
+  'dining-sets': 'Dining Furniture',
+  'dining-furniture': 'Dining Furniture',
+  office: 'Office Furniture',
+  'office-furniture': 'Office Furniture',
+};
+
+function normalizeCategoryFilter(rawCategory: string) {
+  const normalized = rawCategory
+    .toLowerCase()
+    .trim()
+    .replace(/[_]+/g, '-')
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+
+  return CATEGORY_ALIASES[normalized] || rawCategory;
+}
+
 // Get all visible products (public endpoint)
 export const getAllProducts = async (req: Request, res: Response) => {
   try {
-    const { category, search, page = 1, limit = 10 } = req.query;
+    const {
+      category,
+      search,
+      page = 1,
+      limit = 10,
+      visibility = 'all',
+    } = req.query;
 
-    // Check if this is an admin request by looking at the URL
     const isAdmin = req.path?.includes('/admin/all');
+    const normalizedPage = Math.max(Number(page) || 1, 1);
+    const normalizedLimit = Math.max(Number(limit) || 10, 1);
+    const skip = (normalizedPage - 1) * normalizedLimit;
+
     const filter: any = isAdmin ? {} : { isVisible: true };
-    
-    if (category) filter.category = category;
-    if (search) filter.name = { $regex: search, $options: 'i' };
 
-    const skip = (Number(page) - 1) * Number(limit);
+    if (category) {
+      filter.category = normalizeCategoryFilter(String(category));
+    }
 
-    const products = await Product.find(filter)
-      .skip(skip)
-      .limit(Number(limit))
-      .sort({ createdAt: -1 });
+    if (search) {
+      filter.name = { $regex: String(search), $options: 'i' };
+    }
 
-    const total = await Product.countDocuments(filter);
+    if (isAdmin) {
+      if (visibility === 'visible') {
+        filter.isVisible = true;
+      } else if (visibility === 'hidden') {
+        filter.isVisible = false;
+      }
+    }
+
+    const [products, total, categoryOptions] = await Promise.all([
+      Product.find(filter)
+        .skip(skip)
+        .limit(normalizedLimit)
+        .sort({ createdAt: -1 }),
+      Product.countDocuments(filter),
+      isAdmin ? Product.distinct('category') : Promise.resolve([]),
+    ]);
 
     res.json({
       success: true,
       products,
       pagination: {
         total,
-        page: Number(page),
-        limit: Number(limit),
-        pages: Math.ceil(total / Number(limit))
-      }
+        page: normalizedPage,
+        limit: normalizedLimit,
+        pages: Math.ceil(total / normalizedLimit),
+      },
+      filters: isAdmin
+        ? {
+            categories: categoryOptions.filter(Boolean).sort(),
+            visibilityOptions: ['all', 'visible', 'hidden'],
+          }
+        : undefined,
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch products' });
