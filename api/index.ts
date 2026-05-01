@@ -116,33 +116,42 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 // Database Connection
-const mongoUri = process.env.MONGODB_URI;
+let isConnected = false;
 
-if (!mongoUri) {
-  console.error('✗ MONGODB_URI is not defined in environment variables');
-  process.exit(1);
-}
+const connectDB = async () => {
+  if (isConnected) return;
+  
+  const mongoUri = process.env.MONGODB_URI;
+  if (!mongoUri) {
+    console.error('✗ MONGODB_URI is not defined in environment variables');
+    return;
+  }
 
-mongoose.connect(mongoUri, {
-  dbName: "dandldb",
-  retryWrites: true,
-  w: 'majority',
-  serverSelectionTimeoutMS: 10000,
-  connectTimeoutMS: 10000,
-  socketTimeoutMS: 45000,
-})
-  .then(() => {
+  try {
+    await mongoose.connect(mongoUri, {
+      dbName: "dandldb",
+      retryWrites: true,
+      w: 'majority',
+      serverSelectionTimeoutMS: 10000,
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    });
+    isConnected = true;
     console.log('✓ Connected to MongoDB');
-  })
-  .catch((err: any) => {
-    console.error('✗ MongoDB connection failed:', err.message);
-    process.exit(1);
-  });
+  } catch (error: any) {
+    console.error('✗ MongoDB connection failed:', error.message);
+  }
+};
 
-// Server Start
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`✓ Server running on http://localhost:${PORT}`);
-});
+// Connect to DB (Vercel will execute this on cold start)
+connectDB();
+
+// Server Start (Only for local development, Vercel handles serving the exported app)
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`✓ Server running on http://localhost:${PORT}`);
+  });
+}
 
 export default app;
