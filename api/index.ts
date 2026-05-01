@@ -4,6 +4,10 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
+import mongoSanitize from 'express-mongo-sanitize';
+import hpp from 'hpp';
 import { errorHandler } from '../middleware/errorHandler';
 
 // Routes
@@ -16,11 +20,42 @@ import bookingRoutes from '../routes/bookings';
 import paymentRoutes from '../routes/payment';
 import favoritesRoutes from '../routes/favorites';
 import deliveryRoutes from '../routes/delivery';
+import customRequirementRoutes from '../routes/customRequirements';
 import routes from '../routes/userRoutes';
 
 dotenv.config();
 
 const app: Express = express();
+
+// 1. Security Headers (Helmet)
+app.use(helmet());
+
+// 2. Rate Limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again after 15 minutes',
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+});
+
+// Apply rate limiter to all routes
+app.use('/api', limiter);
+
+// Special limiter for auth routes (more restrictive)
+const authLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 20, // Limit each IP to 20 auth requests per hour
+  message: 'Too many login attempts from this IP, please try again after an hour'
+});
+app.use('/api/auth/login', authLimiter);
+app.use('/api/admin/auth/login', authLimiter);
+
+// 3. Data Sanitization against NoSQL Query Injection
+app.use(mongoSanitize());
+
+// 4. Prevent HTTP Parameter Pollution
+app.use(hpp());
 
 // CORS Configuration - Production Ready
 const allowedOrigins = [
@@ -44,19 +79,14 @@ app.use(cors({
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   maxAge: 86400 // 24 hours
 }));
 
-app.use(bodyParser.json({ limit: '10mb' }));
-app.use(bodyParser.urlencoded({ limit: '10mb', extended: true }));
+app.use(bodyParser.json({ limit: '50mb' })); // Increased for image uploads
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 
-// Request logging middleware
-app.use((req, res, next) => {
-  next();
-});
-
-// Cookie parser middleware (if using cookies)
+// Cookie parser middleware
 import cookieParser from 'cookie-parser';
 app.use(cookieParser());
 
@@ -75,6 +105,7 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/favorites', favoritesRoutes);
 app.use('/api/delivery', deliveryRoutes);
+app.use('/api/custom-requirements', customRequirementRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -85,7 +116,12 @@ app.use((req, res) => {
 app.use(errorHandler);
 
 // Database Connection
-const mongoUri = process.env.MONGODB_URI || 'mongodb+srv://dlfurniture99_db_user:fDdaaPnkkQWXdDj2@cluster0.hisi1qq.mongodb.net';
+const mongoUri = process.env.MONGODB_URI;
+
+if (!mongoUri) {
+  console.error('✗ MONGODB_URI is not defined in environment variables');
+  process.exit(1);
+}
 
 mongoose.connect(mongoUri, {
   dbName: "dandldb",

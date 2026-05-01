@@ -10,10 +10,15 @@ interface DatabaseConfig {
 }
 
 const config: DatabaseConfig = {
-    uri: process.env.MONGODB_URI || 'mongodb://localhost:27017/furniture-store',
+    uri: process.env.MONGODB_URI || '',
     retryAttempts: parseInt(process.env.DB_RETRY_ATTEMPTS || '3', 10),
     retryDelay: parseInt(process.env.DB_RETRY_DELAY || '5000', 10),
 };
+
+if (!config.uri) {
+    console.error('❌ MONGODB_URI is not defined in environment variables');
+    process.exit(1);
+}
 
 let isConnected: boolean = false;
 

@@ -21,12 +21,21 @@ export const authMiddleware = (req: AuthRequest, res: Response, next: NextFuncti
        return res.status(401).json({ success: false, message: 'No token provided' });
      }
 
-     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+     const jwtSecret = process.env.JWT_SECRET;
+     if (!jwtSecret) {
+       console.error('JWT_SECRET is not defined');
+       return res.status(500).json({ success: false, message: 'Authentication configuration error' });
+     }
+
+     const decoded = jwt.verify(token, jwtSecret);
      req.userId = (decoded as any).id || (decoded as any).userId;
      req.userRole = (decoded as any).role;
      req.user = decoded;
      return next();
    } catch (error) {
+     if (error instanceof jwt.TokenExpiredError) {
+       return res.status(401).json({ success: false, message: 'Token expired' });
+     }
      console.error('[AUTH ERROR]', error instanceof Error ? error.message : error);
      return res.status(401).json({ success: false, message: 'Invalid token' });
    }

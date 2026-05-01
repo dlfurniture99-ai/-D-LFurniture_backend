@@ -55,17 +55,22 @@ export const authController = {
 
       await newUser.save();
 
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) {
+        throw new Error('JWT_SECRET is not configured');
+      }
+
       // Generate JWT token
       const token = jwt.sign(
         { userId: newUser._id, role: newUser.role },
-        process.env.JWT_SECRET || 'your-secret-key',
+        jwtSecret,
         { expiresIn: '7d' }
       );
 
       // Send verification email (non-blocking)
       const verificationToken = jwt.sign(
         { userId: newUser._id },
-        process.env.JWT_SECRET || 'your-secret-key',
+        jwtSecret,
         { expiresIn: '24h' }
       );
 
@@ -132,10 +137,15 @@ export const authController = {
       //   return;
       // }
 
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) {
+        throw new Error('JWT_SECRET is not configured');
+      }
+
       // Generate JWT token
       const token = jwt.sign(
         { userId: user._id, role: user.role },
-        process.env.JWT_SECRET || 'your-secret-key',
+        jwtSecret,
         { expiresIn: '7d' }
       );
 
@@ -222,10 +232,15 @@ export const authController = {
         await user.save();
       }
 
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) {
+        throw new Error('JWT_SECRET is not configured');
+      }
+
       // Generate JWT token
       const jwtToken = jwt.sign(
         { userId: user._id, role: user.role },
-        process.env.JWT_SECRET || 'your-secret-key',
+        jwtSecret,
         { expiresIn: '7d' }
       );
 
@@ -440,10 +455,15 @@ export const authController = {
       deliveryBoy.loginOtpExpires = null;
       await deliveryBoy.save();
 
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) {
+        throw new Error('JWT_SECRET is not configured');
+      }
+
       // Generate JWT token
       const token = jwt.sign(
         { userId: deliveryBoy._id, role: deliveryBoy.role },
-        process.env.JWT_SECRET || 'your-secret-key',
+        jwtSecret,
         { expiresIn: '7d' }
       );
 

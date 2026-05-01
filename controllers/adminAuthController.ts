@@ -118,10 +118,15 @@ export const adminAuthController = {
       admin.isVerified = true;
       await admin.save();
 
+      const jwtSecret = process.env.JWT_SECRET;
+      if (!jwtSecret) {
+        throw new Error('JWT_SECRET is not configured');
+      }
+
       // Generate JWT token
       const token = jwt.sign(
         { userId: admin._id, role: admin.role },
-        process.env.JWT_SECRET || 'your-secret-key',
+        jwtSecret,
         { expiresIn: '7d' }
       );
 

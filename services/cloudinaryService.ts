@@ -31,6 +31,8 @@ export const uploadImageFromDataUrl = async (
     const result = await cloudinary.uploader.upload(dataUrl, {
       folder: 'furniture-products',
       resource_type: 'auto',
+      fetch_format: 'auto',
+      quality: 'auto',
     });
 
     return (result as CloudinaryUploadResponse).secure_url;
