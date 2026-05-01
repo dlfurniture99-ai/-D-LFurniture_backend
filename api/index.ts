@@ -94,10 +94,25 @@ app.use(bodyParser.urlencoded({ limit: '50mb', extended: true }));
 import cookieParser from 'cookie-parser';
 app.use(cookieParser());
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ success: true, message: 'Server is running' });
-});
+// Comprehensive Health Check Routes
+const healthCheck = (req: any, res: any) => {
+  const dbStatus = mongoose.connection.readyState;
+  // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+  
+  res.status(200).json({ 
+    success: true, 
+    message: 'Furniture API Server is UP and Running! 🚀',
+    environment: process.env.NODE_ENV || 'development',
+    db_connected: dbStatus === 1,
+    db_status_code: dbStatus,
+    timestamp: new Date().toISOString()
+  });
+};
+
+app.get('/', healthCheck);
+app.get('/api', healthCheck);
+app.get('/api/health', healthCheck);
+app.get('/health', healthCheck);
 
 // Routes
 app.use('/api', routes)
