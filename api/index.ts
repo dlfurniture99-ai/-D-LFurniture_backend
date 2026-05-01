@@ -27,6 +27,10 @@ dotenv.config();
 
 const app: Express = express();
 
+// Trust proxy is required when app is behind a reverse proxy (like Vercel)
+// This fixes the express-rate-limit 'ERR_ERL_UNEXPECTED_X_FORWARDED_FOR' error
+app.set('trust proxy', 1);
+
 // 1. Security Headers (Helmet)
 app.use(helmet());
 
