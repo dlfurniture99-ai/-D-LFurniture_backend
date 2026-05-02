@@ -34,7 +34,7 @@ export const adminController = {
        const customersWithStats = await Promise.all(
          users.map(async (user) => {
            const bookings = await Booking.find({ userId: user._id });
-           const totalSpent = bookings.reduce((sum, booking) => sum + (booking.totalPrice || 0), 0);
+           const totalSpent = bookings.reduce((sum, booking) => sum + (booking.finalAmount || booking.totalAmount || (booking as any).totalPrice || 0), 0);
            
            return {
              _id: user._id,

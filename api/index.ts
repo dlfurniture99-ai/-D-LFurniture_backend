@@ -21,6 +21,9 @@ import paymentRoutes from '../routes/payment';
 import favoritesRoutes from '../routes/favorites';
 import deliveryRoutes from '../routes/delivery';
 import customRequirementRoutes from '../routes/customRequirements';
+import blogRoutes from '../routes/blogRoutes';
+import uploadRoutes from '../routes/upload';
+import aiRoutes from '../routes/aiRoutes';
 import routes from '../routes/userRoutes';
 
 dotenv.config();
@@ -125,6 +128,9 @@ app.use('/api/payment', paymentRoutes);
 app.use('/api/favorites', favoritesRoutes);
 app.use('/api/delivery', deliveryRoutes);
 app.use('/api/custom-requirements', customRequirementRoutes);
+app.use('/api/blogs', blogRoutes);
+app.use('/api/upload', uploadRoutes);
+app.use('/api/blogs', aiRoutes);
 
 // 404 handler
 app.use((req, res) => {

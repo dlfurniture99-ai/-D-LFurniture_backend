@@ -562,6 +562,150 @@ class EmailService {
       html
     });
   }
+
+  async sendOnlinePaymentConfirmation(email: string, customerName: string, orderDetails: any): Promise<void> {
+    const bookingDate = new Date(orderDetails.createdAt || new Date());
+    const dateStr = bookingDate.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = bookingDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0;">✅ Payment Successful – Order Confirmed</h1>
+        </div>
+        <div style="padding: 30px; background-color: #f9f9f9;">
+          <p>Hello <strong>${customerName}</strong>,</p>
+          <p>Your online payment was successful and your order has been confirmed! 🎉</p>
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #16a34a;">
+            <h3 style="color: #333; margin-top: 0;">📋 Order Details</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 10px 0;"><strong>Order ID:</strong></td>
+                <td style="padding: 10px 0; text-align: right; color: #16a34a; font-weight: bold; font-size: 16px;">${orderDetails.orderId}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 10px 0;"><strong>Transaction ID:</strong></td>
+                <td style="padding: 10px 0; text-align: right; font-family: monospace; font-size: 13px;">${orderDetails.paymentId || 'N/A'}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 10px 0;"><strong>Date:</strong></td>
+                <td style="padding: 10px 0; text-align: right;">${dateStr} at ${timeStr}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 10px 0;"><strong>Payment Method:</strong></td>
+                <td style="padding: 10px 0; text-align: right;"><span style="background:#dcfce7;color:#166534;padding:4px 8px;border-radius:4px;font-weight:bold;">Online Payment (Razorpay)</span></td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0;"><strong>Total Amount:</strong></td>
+                <td style="padding: 10px 0; text-align: right; color: #16a34a; font-weight: bold; font-size: 18px;">₹${orderDetails.total.toLocaleString()}</td>
+              </tr>
+            </table>
+          </div>
+          <div style="background: white; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #e5e7eb;">
+            <h4 style="margin-top: 0; color: #333;">🛒 Items Ordered</h4>
+            ${orderDetails.items.map((item: any) => `
+              <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+                <span>${item.name} × ${item.quantity}</span>
+                <span style="font-weight:bold;">₹${(item.price * item.quantity).toLocaleString()}</span>
+              </div>
+            `).join('')}
+            <div style="display:flex;justify-content:space-between;padding:10px 0;font-weight:bold;color:#16a34a;">
+              <span>Total:</span><span>₹${orderDetails.total.toLocaleString()}</span>
+            </div>
+          </div>
+          <div style="background:#f0fdf4;padding:15px;border-radius:8px;margin:20px 0;">
+            <h4 style="margin-top:0;color:#166534;">📦 Delivery Address</h4>
+            <p style="color:#166534;margin:0;">${orderDetails.address}</p>
+          </div>
+          <p>We'll ship your order within 1-2 business days and notify you with tracking details.</p>
+          <p style="color:#666;font-size:12px;margin-top:30px;">Questions? Reply to this email or contact our support.</p>
+        </div>
+      </div>
+    `;
+
+    await this.sendEmail({
+      to: email,
+      subject: `✅ Order Confirmed – ${orderDetails.orderId} | The Wooden Space`,
+      html,
+    });
+  }
+
+  async sendOnlinePaymentNotificationToAdmin(adminEmail: string, orderDetails: any): Promise<void> {
+    const bookingDate = new Date(orderDetails.createdAt || new Date());
+    const dateStr = bookingDate.toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' });
+    const timeStr = bookingDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+    const html = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%); padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+          <h1 style="color: white; margin: 0;">💳 New Online Payment Order</h1>
+        </div>
+        <div style="padding: 30px; background-color: #f9f9f9;">
+          <p>Hello Admin,</p>
+          <p>A new order has been placed and payment has been <strong style="color:#16a34a;">verified by Razorpay</strong>.</p>
+          <div style="background: white; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1d4ed8;">
+            <h3 style="margin-top: 0; color: #333;">📋 Order Details</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 10px 0;"><strong>Order ID:</strong></td>
+                <td style="padding: 10px 0; text-align: right; color: #1d4ed8; font-weight: bold;">${orderDetails.orderId}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 10px 0;"><strong>Transaction ID:</strong></td>
+                <td style="padding: 10px 0; text-align: right; font-family: monospace; font-size: 13px;">${orderDetails.paymentId || 'N/A'}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 10px 0;"><strong>Date:</strong></td>
+                <td style="padding: 10px 0; text-align: right;">${dateStr} at ${timeStr}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 10px 0;"><strong>Customer:</strong></td>
+                <td style="padding: 10px 0; text-align: right;">${orderDetails.customerName} (${orderDetails.customerEmail})</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 10px 0;"><strong>Phone:</strong></td>
+                <td style="padding: 10px 0; text-align: right;">${orderDetails.phone}</td>
+              </tr>
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 10px 0;"><strong>Delivery Address:</strong></td>
+                <td style="padding: 10px 0; text-align: right; max-width: 250px;">${orderDetails.address}</td>
+              </tr>
+              <tr>
+                <td style="padding: 10px 0;"><strong>Total:</strong></td>
+                <td style="padding: 10px 0; text-align: right; color: #16a34a; font-weight: bold; font-size: 18px;">₹${orderDetails.total.toLocaleString()}</td>
+              </tr>
+            </table>
+          </div>
+          <div style="background: white; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #e5e7eb;">
+            <h4 style="margin-top: 0; color: #333;">🛒 Items</h4>
+            ${orderDetails.items.map((item: any) => `
+              <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f0f0f0;">
+                <div>
+                  <div style="font-weight:bold;">${item.name}</div>
+                  <div style="font-size:12px;color:#666;">Qty: ${item.quantity}</div>
+                </div>
+                <span style="font-weight:bold;">₹${(item.price * item.quantity).toLocaleString()}</span>
+              </div>
+            `).join('')}
+          </div>
+          <div style="background:#eff6ff;padding:15px;border-radius:8px;margin:20px 0;">
+            <h4 style="margin-top:0;color:#1e40af;">⚡ Action Required</h4>
+            <ul style="color:#1e40af;margin:10px 0;padding-left:20px;">
+              <li>Payment has been <strong>received</strong> – prepare the order for dispatch</li>
+              <li>Verify inventory and arrange delivery logistics</li>
+              <li>Update order status in the admin panel</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    `;
+
+    await this.sendEmail({
+      to: adminEmail,
+      subject: `💳 New Online Order – ${orderDetails.orderId} | ₹${orderDetails.total.toLocaleString()}`,
+      html,
+    });
+  }
 }
 
 export default new EmailService();

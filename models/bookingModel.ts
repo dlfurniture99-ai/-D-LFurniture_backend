@@ -4,6 +4,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 export interface IBooking extends Document {
     userId: mongoose.Types.ObjectId;
     orderId?: string;
+    bookingId?: string; // Compatibility with older code
     items: {
         productId: mongoose.Types.ObjectId;
         productName: string;
@@ -16,6 +17,7 @@ export interface IBooking extends Document {
     finalAmount: number;
     bookingDate: Date;
     deliveryDate?: Date;
+    deliveredDate?: Date;
     deliveryAddress: {
         name: string;
         email: string;
@@ -34,13 +36,21 @@ export interface IBooking extends Document {
         postalCode: string;
         country: string;
     };
-    paymentMethod: 'creditCard' | 'debitCard' | 'netBanking' | 'upi' | 'wallet' | 'cod';
+    paymentMethod: 'creditCard' | 'debitCard' | 'netBanking' | 'upi' | 'wallet' | 'cod' | 'online' | 'card' | 'netbanking';
     paymentStatus: 'pending' | 'completed' | 'failed' | 'refunded';
     transactionId?: string;
-    bookingStatus: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
+    bookingStatus: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered' | 'cancelled' | 'ready_for_delivery';
     cancellationReason?: string;
     cancellationDate?: Date;
     notes?: string;
+    
+    // Delivery Specific Fields (from old Booking.ts)
+    deliveryOtp?: string;
+    otpVerified: boolean;
+    deliveryBoyId?: mongoose.Types.ObjectId;
+    deliveryBoyName?: string;
+    deliveryBoyPhone?: string;
+    
     createdAt: Date;
     updatedAt: Date;
 }
@@ -59,6 +69,10 @@ const BookingSchema = new Schema<IBooking>(
             unique: true,
             sparse: true,
             index: true,
+        },
+        bookingId: { // Alias for orderId to support older code
+            type: String,
+            sparse: true,
         },
         items: [
             {
@@ -109,6 +123,9 @@ const BookingSchema = new Schema<IBooking>(
         deliveryDate: {
             type: Date,
         },
+        deliveredDate: {
+            type: Date,
+        },
         deliveryAddress: {
             name: {
                 type: String,
@@ -118,12 +135,10 @@ const BookingSchema = new Schema<IBooking>(
                 type: String,
                 required: [true, 'Email is required'],
                 lowercase: true,
-                match: [/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/, 'Invalid email format'],
             },
             phone: {
                 type: String,
                 required: [true, 'Phone number is required'],
-                match: [/^[0-9]{10}$/, 'Phone number must be 10 digits'],
             },
             street: {
                 type: String,
@@ -140,7 +155,6 @@ const BookingSchema = new Schema<IBooking>(
             postalCode: {
                 type: String,
                 required: [true, 'Postal code is required'],
-                match: [/^[0-9]{6}$/, 'Postal code must be 6 digits'],
             },
             country: {
                 type: String,
@@ -157,10 +171,6 @@ const BookingSchema = new Schema<IBooking>(
         },
         paymentMethod: {
             type: String,
-            enum: {
-                values: ['creditCard', 'debitCard', 'netBanking', 'upi', 'wallet', 'cod'],
-                message: '{VALUE} is not a valid payment method',
-            },
             required: [true, 'Payment method is required'],
         },
         paymentStatus: {
@@ -178,10 +188,6 @@ const BookingSchema = new Schema<IBooking>(
         },
         bookingStatus: {
             type: String,
-            enum: {
-                values: ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'],
-                message: '{VALUE} is not a valid booking status',
-            },
             default: 'pending',
             index: true,
         },
@@ -195,6 +201,22 @@ const BookingSchema = new Schema<IBooking>(
             type: String,
             maxlength: [500, 'Notes cannot exceed 500 characters'],
         },
+        
+        // Delivery Specific (from old Booking.ts)
+        deliveryOtp: {
+            type: String,
+            select: false
+        },
+        otpVerified: {
+            type: Boolean,
+            default: false
+        },
+        deliveryBoyId: {
+            type: Schema.Types.ObjectId,
+            ref: 'User'
+        },
+        deliveryBoyName: String,
+        deliveryBoyPhone: String
     },
     {
         timestamps: true,
@@ -205,68 +227,18 @@ const BookingSchema = new Schema<IBooking>(
 // Indexes
 BookingSchema.index({ userId: 1, bookingDate: -1 });
 BookingSchema.index({ bookingStatus: 1, paymentStatus: 1 });
-BookingSchema.index({ deliveryDate: 1 });
 
 // Pre-save middleware
 BookingSchema.pre<IBooking>('save', function (next) {
     if (!this.orderId) {
         this.orderId = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
     }
+    if (!this.bookingId) {
+        this.bookingId = this.orderId;
+    }
     next();
 });
 
-// Instance methods
-BookingSchema.methods.cancelBooking = function (reason: string) {
-    if (this.bookingStatus === 'delivered') {
-        throw new Error('Cannot cancel delivered booking');
-    }
-    this.bookingStatus = 'cancelled';
-    this.cancellationReason = reason;
-    this.cancellationDate = new Date();
-    return this.save();
-};
-
-BookingSchema.methods.updatePaymentStatus = function (status: string, transactionId?: string) {
-    if (!['pending', 'completed', 'failed', 'refunded'].includes(status)) {
-        throw new Error('Invalid payment status');
-    }
-    this.paymentStatus = status;
-    if (transactionId) {
-        this.transactionId = transactionId;
-    }
-    return this.save();
-};
-
-BookingSchema.methods.getOrderSummary = function () {
-    return {
-        orderId: this.orderId,
-        totalAmount: this.totalAmount,
-        discountAmount: this.discountAmount,
-        finalAmount: this.finalAmount,
-        bookingStatus: this.bookingStatus,
-        paymentStatus: this.paymentStatus,
-        bookingDate: this.bookingDate,
-        deliveryDate: this.deliveryDate,
-    };
-};
-
-// Static methods
-BookingSchema.statics.findByOrderId = function (orderId: string) {
-    return this.findOne({ orderId });
-};
-
-BookingSchema.statics.findByUserId = function (userId: string) {
-    return this.find({ userId }).sort({ bookingDate: -1 });
-};
-
-BookingSchema.statics.getPendingBookings = function () {
-    return this.find({ bookingStatus: 'pending', paymentStatus: 'pending' });
-};
-
-BookingSchema.statics.getCompletedBookings = function () {
-    return this.find({ bookingStatus: 'delivered', paymentStatus: 'completed' });
-};
-
 // Export
-const Booking: Model<IBooking> = mongoose.model<IBooking>('Booking', BookingSchema);
+const Booking: Model<IBooking> = mongoose.models.Booking || mongoose.model<IBooking>('Booking', BookingSchema);
 export default Booking;

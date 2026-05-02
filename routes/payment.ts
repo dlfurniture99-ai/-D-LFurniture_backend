@@ -1,30 +1,41 @@
 import { Router } from 'express';
-import PaymentService from '../controllers/paymentController';
-import { authMiddleware } from '../middleware/auth';
+import { authMiddleware, adminMiddleware } from '../middleware/auth';
+import {
+  createRazorpayOrder,
+  verifyAndBook,
+  placeCODOrder,
+  getPaymentStatus,
+  refundPayment,
+} from '../controllers/paymentController';
 
 const router = Router();
 
 /**
- * Checkout routes (for cart checkout)
+ * ─── Razorpay Online Payment Flow ───────────────────────────────────────────
+ *
+ * Step 1 – Frontend sends productIds + quantities → backend fetches DB prices
+ *           and creates a Razorpay order with the server-calculated amount.
+ *
+ * Step 2 – After user completes payment in Razorpay widget, frontend sends
+ *           payment IDs + signature → backend verifies signature HMAC-SHA256,
+ *           re-checks prices, then creates the booking.
  */
-router.post('/create-order', authMiddleware, (req, res) => PaymentService.checkoutCreateOrder(req, res));
-router.post('/verify-payment', authMiddleware, (req, res) => PaymentService.checkoutVerifyPayment(req, res));
+router.post('/create-order',   authMiddleware, createRazorpayOrder);
+router.post('/verify-and-book', authMiddleware, verifyAndBook);
 
 /**
- * Cash on Delivery route
+ * ─── Cash on Delivery Flow ──────────────────────────────────────────────────
+ *
+ * Backend still verifies prices from DB before creating the booking.
  */
-router.post('/place-cod-order', authMiddleware, (req, res) => PaymentService.placeCODOrder(req, res));
+router.post('/place-cod-order', authMiddleware, placeCODOrder);
 
 /**
- * Single booking payment routes
+ * ─── Payment Utilities ──────────────────────────────────────────────────────
  */
-router.post('/booking/create-order', authMiddleware, (req, res) => PaymentService.createOrderHandler(req, res));
-router.post('/booking/verify', authMiddleware, (req, res) => PaymentService.verifyPaymentHandler(req, res));
+router.get('/status/:paymentId', authMiddleware, getPaymentStatus);
 
-/**
- * Payment status and refund
- */
-router.get('/status/:paymentId', authMiddleware, (req, res) => PaymentService.getStatus(req, res));
-router.post('/refund', authMiddleware, (req, res) => PaymentService.refund(req, res));
+/** Refund – admin only */
+router.post('/refund', authMiddleware, adminMiddleware, refundPayment);
 
 export default router;

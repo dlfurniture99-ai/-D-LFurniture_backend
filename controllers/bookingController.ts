@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import Booking from '../models/Booking';
 import Product from '../models/Product';
 import User from '../models/User';
@@ -54,12 +55,20 @@ export const bookingController = {
       // Create booking
        const booking = new Booking({
          bookingId,
+         orderId: `ORD-${bookingId.split('-')[1]}`, // Compatible orderId
          userId,
-         productId,
-         quantity,
-         totalPrice,
+         items: [{
+           productId,
+           productName: product.name,
+           quantity,
+           price: product.price,
+           image: product.image
+         }],
+         totalAmount: totalPrice,
+         finalAmount: totalPrice,
          paymentMethod: 'card',
-         shippingAddress
+         deliveryAddress: shippingAddress,
+         bookingStatus: 'pending'
        });
 
       await booking.save();
@@ -103,7 +112,7 @@ export const bookingController = {
   async getUserBookings(req: any, res: Response): Promise<any> {
     try {
       const bookings = await Booking.find({ userId: req.userId })
-        .populate('productId')
+        .populate('items.productId')
         .sort({ createdAt: -1 });
 
       res.json({ success: true, bookings });
@@ -118,8 +127,13 @@ export const bookingController = {
    */
   async getById(req: any, res: Response): Promise<any> {
     try {
-      const booking = await Booking.findById(req.params.id)
-        .populate('productId')
+      const { id } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ success: false, message: 'Invalid booking ID format' });
+      }
+
+      const booking = await Booking.findById(id)
+        .populate('items.productId')
         .populate('userId');
 
       if (!booking) {
@@ -139,35 +153,69 @@ export const bookingController = {
   },
 
   /**
-   * Get all bookings (admin only)
+   * Get all bookings (admin only) — new bookingModel schema
    */
   async getAllAdmin(req: Request, res: Response): Promise<any> {
     try {
-      const { status, page = 1, limit = 10 } = req.query;
+      const { status, paymentMethod, page = 1, limit = 50 } = req.query;
       const filter: any = {};
 
-      if (status) filter.status = status;
+      if (status && status !== 'all') filter.bookingStatus = status;
+      if (paymentMethod && paymentMethod !== 'all') filter.paymentMethod = paymentMethod;
 
       const skip = (Number(page) - 1) * Number(limit);
 
+      // Razorpay commission constants (domestic: 2% + 18% GST on commission)
+      const RAZORPAY_RATE = 0.02;
+      const GST_RATE = 0.18;
+
       const bookings = await Booking.find(filter)
-        .populate('userId')
-        .populate('productId')
+        .populate('userId', 'name email phone createdAt')
         .skip(skip)
         .limit(Number(limit))
-        .sort({ createdAt: -1 });
+        .sort({ createdAt: -1 })
+        .lean();
 
       const total = await Booking.countDocuments(filter);
 
+      // Enrich each booking with commission data
+      const enrichedBookings = bookings.map((b: any) => {
+        const total = b.finalAmount || b.totalAmount || b.totalPrice || 0;
+        const isOnline = b.paymentMethod !== 'cod';
+        const currentStatus = b.bookingStatus || b.status || 'pending';
+
+        let razorpayCommission = 0;
+        let razorpayGST = 0;
+        let netReceived = total;
+
+        if (isOnline && (b.paymentStatus === 'completed' || b.paymentStatus === 'online')) {
+          razorpayCommission = Math.round(total * RAZORPAY_RATE * 100) / 100;
+          razorpayGST = Math.round(razorpayCommission * GST_RATE * 100) / 100;
+          netReceived = Math.round((total - razorpayCommission - razorpayGST) * 100) / 100;
+        }
+
+        return {
+          ...b,
+          finalAmount: total,
+          totalAmount: b.totalAmount || total,
+          bookingStatus: currentStatus,
+          status: currentStatus,
+          razorpayCommission,
+          razorpayGST,
+          netReceived,
+          totalRazorpayDeduction: Math.round((razorpayCommission + razorpayGST) * 100) / 100,
+        };
+      });
+
       res.json({
         success: true,
-        bookings,
+        bookings: enrichedBookings,
         pagination: {
           total,
           page: Number(page),
           limit: Number(limit),
-          pages: Math.ceil(total / Number(limit))
-        }
+          pages: Math.ceil(total / Number(limit)),
+        },
       });
     } catch (error) {
       console.error('Get all bookings error:', error);
@@ -180,12 +228,17 @@ export const bookingController = {
    */
   async updateStatus(req: any, res: Response): Promise<any> {
     try {
+      const { id } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ success: false, message: 'Invalid booking ID format' });
+      }
+
       const { status, paymentStatus } = req.body;
       const booking = await Booking.findByIdAndUpdate(
-        req.params.id,
-        { status, paymentStatus },
+        id,
+        { bookingStatus: status, paymentStatus },
         { new: true }
-      ).populate('userId').populate('productId');
+      ).populate('userId').populate('items.productId');
 
       if (!booking) {
         return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -196,8 +249,8 @@ export const bookingController = {
       if (user) {
         await emailService.sendOrderStatusUpdate(user.email, {
           customerName: user.name,
-          bookingId: booking.bookingId,
-          status: status || booking.status
+          bookingId: booking.orderId || booking.bookingId,
+          status: status || booking.bookingStatus || (booking as any).status
         });
       }
 
@@ -213,21 +266,34 @@ export const bookingController = {
    */
   async cancel(req: Request, res: Response): Promise<any> {
     try {
+      const { id } = req.params;
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({ success: false, message: 'Invalid booking ID format' });
+      }
+
       const booking = await Booking.findByIdAndUpdate(
-        req.params.id,
-        { status: 'cancelled' },
+        id,
+        { bookingStatus: 'cancelled' },
         { new: true }
-      ).populate('productId');
+      ).populate('items.productId');
 
       if (!booking) {
         return res.status(404).json({ success: false, message: 'Booking not found' });
       }
 
-      // Refund stock
-      const product = await Product.findById(booking.productId);
-      if (product) {
-        product.stock += booking.quantity;
-        await product.save();
+      // Refund stock for all items
+      if (booking.items && booking.items.length > 0) {
+        for (const item of booking.items) {
+          try {
+            const product = await Product.findById(item.productId);
+            if (product) {
+              product.stock += item.quantity;
+              await product.save();
+            }
+          } catch (err) {
+            console.error(`Failed to refund stock for product ${item.productId}:`, err);
+          }
+        }
       }
 
       res.json({ success: true, message: 'Booking cancelled', booking });
@@ -249,7 +315,7 @@ export const bookingController = {
       }
 
       const booking = await Booking.findOne({ bookingId: bookingId })
-        .populate('productId')
+        .populate('items.productId')
         .populate('userId');
 
       if (!booking) {

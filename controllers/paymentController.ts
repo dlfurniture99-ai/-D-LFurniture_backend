@@ -1,416 +1,615 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import { config } from 'dotenv';
-import Booking from '../models/Booking';
-import Product from '../models/Product';
+import mongoose from 'mongoose';
+import Booking from '../models/bookingModel';
+import productModel from '../models/productModel';
 import User from '../models/User';
 import emailService from '../services/emailService';
 
 // Load environment variables FIRST
 config();
 
-interface PaymentOrder {
-  orderId: string;
-  amount: number;
-  currency: string;
+// ─────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────
+interface CartItemInput {
+  productId: string;
+  quantity: number;
 }
 
-interface VerifyPaymentParams {
+interface VerifiedCartItem {
+  productId: mongoose.Types.ObjectId;
+  productName: string;
+  quantity: number;
+  price: number;
+  image?: string;
+}
+
+interface VerifyPaymentBody {
   razorpay_order_id: string;
   razorpay_payment_id: string;
   razorpay_signature: string;
+  cartItems: CartItemInput[];
+  shippingAddress: {
+    name: string;
+    email: string;
+    phone: string;
+    street: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country?: string;
+  };
 }
 
-class PaymentService {
-  private razorpay: Razorpay | null = null;
-  private keyId: string;
-  private keySecret: string;
+// ─────────────────────────────────────────────
+// Razorpay singleton
+// ─────────────────────────────────────────────
+class RazorpayGateway {
+  private instance: Razorpay | null = null;
+  private readonly keyId: string;
+  private readonly keySecret: string;
 
   constructor() {
-    console.log('🚀 PaymentService instantiated...');
-    
-    // Get credentials from environment
     this.keyId = process.env.RAZORPAY_KEY_ID || '';
     this.keySecret = process.env.RAZORPAY_KEY_SECRET || '';
 
-    console.log('🔍 Debug - Checking Razorpay credentials:');
-    console.log('RAZORPAY_KEY_ID exists:', !!this.keyId);
-    console.log('RAZORPAY_KEY_SECRET exists:', !!this.keySecret);
-
     if (!this.keyId || !this.keySecret) {
-      console.warn('⚠️  WARNING: Razorpay credentials not found in environment variables');
-      console.warn('Please set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in your .env file');
-      return; // Don't throw, allow service to load
+      console.warn('⚠️  Razorpay credentials missing – payment operations will fail.');
+      return;
     }
 
-    // Initialize Razorpay
     try {
-      console.log('✓ Razorpay credentials found');
-      console.log('Key ID preview:', this.keyId.substring(0, 10) + '...');
-      
-      this.razorpay = new Razorpay({
+      this.instance = new Razorpay({
         key_id: this.keyId,
-        key_secret: this.keySecret
+        key_secret: this.keySecret,
       });
-      
-      console.log('✓ Razorpay instance created successfully');
-    } catch (error: any) {
-      console.error('❌ Failed to initialize Razorpay:', error.message);
-      console.warn('⚠️  Continuing without Razorpay - payment operations will fail');
+      console.log('✓ Razorpay gateway initialised |', this.keyId.substring(0, 14) + '...');
+    } catch (err: any) {
+      console.error('❌ Razorpay init failed:', err.message);
     }
   }
 
-  /**
-   * Get Razorpay instance (lazy initialization if needed)
-   */
-  private getRazorpayInstance(): Razorpay {
-    if (!this.razorpay) {
-      throw new Error('Razorpay not initialized. Check your credentials.');
-    }
-    return this.razorpay;
+  getInstance(): Razorpay {
+    if (!this.instance) throw new Error('Razorpay not initialised – check credentials.');
+    return this.instance;
   }
 
-  /**
-   * Create a payment order
-   */
-  async createOrder(amount: number, receipt: string): Promise<PaymentOrder> {
-    try {
-      console.log(`📝 Creating Razorpay order for booking: ${receipt} amount: ${amount}`);
-      
-      const options = {
-        amount: amount * 100, // Convert to paise
-        currency: 'INR',
-        receipt,
-        payment_capture: 1
-      };
-
-      console.log('📤 Sending to Razorpay:', options);
-
-      const instance = this.getRazorpayInstance();
-      const order = await instance.orders.create(options);
-
-      console.log('✓ Order created:', order.id);
-
-      return {
-        orderId: order.id,
-        amount: Number(order.amount),
-        currency: order.currency
-      };
-    } catch (error: any) {
-      console.error('❌ Razorpay order creation failed:', error);
-      
-      // Provide specific error messages
-      if (error.statusCode === 401) {
-        console.error('⚠️  Authentication failed - Check your Razorpay API keys');
-        throw new Error('Invalid Razorpay credentials');
-      }
-      
-      throw new Error(error.error?.description || error.message || 'Failed to create order');
-    }
-  }
-
-  /**
-   * Verify payment signature
-   */
-  verifyPayment(params: VerifyPaymentParams): boolean {
-    try {
-      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = params;
-
-      console.log('🔐 Verifying payment signature...');
-
-      // Create signature
-      const text = `${razorpay_order_id}|${razorpay_payment_id}`;
-      const generated_signature = crypto
-        .createHmac('sha256', this.keySecret)
-        .update(text)
-        .digest('hex');
-
-      const isValid = generated_signature === razorpay_signature;
-      
-      if (isValid) {
-        console.log('✓ Payment signature verified successfully');
-      } else {
-        console.error('❌ Payment signature verification failed');
-      }
-
-      return isValid;
-    } catch (error) {
-      console.error('❌ Payment verification error:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Get payment details
-   */
-  async getPaymentDetails(paymentId: string) {
-    try {
-      const instance = this.getRazorpayInstance();
-      const payment = await instance.payments.fetch(paymentId);
-      return payment;
-    } catch (error: any) {
-      console.error('❌ Failed to fetch payment details:', error);
-      throw new Error(error.error?.description || 'Failed to fetch payment details');
-    }
-  }
-
-  /**
-   * Refund payment
-   */
-  async refundPayment(paymentId: string, amount: number) {
-    try {
-      console.log(`💰 Processing refund for payment: ${paymentId}, amount: ${amount}`);
-      
-      const instance = this.getRazorpayInstance();
-      const refund = await instance.payments.refund(paymentId, {
-        amount: amount * 100 // Convert to paise
-      });
-
-      console.log('✓ Refund processed:', refund.id);
-
-      return {
-        refundId: refund.id,
-        status: refund.status,
-        amount: (refund.amount || 0) / 100
-      };
-    } catch (error: any) {
-      console.error('❌ Refund failed:', error);
-      throw new Error(error.error?.description || 'Failed to process refund');
-    }
-  }
-
-  /**
-   * Get Razorpay Key ID (for frontend)
-   */
   getKeyId(): string {
     return this.keyId;
   }
 
-  /**
-   * Checkout: Create order (handler for Express)
-   */
-  async checkoutCreateOrder(req: any, res: any) {
-    try {
-      const { amount, receipt } = req.body;
-      const order = await this.createOrder(amount, receipt);
-      res.json({ success: true, data: order });
-    } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message });
-    }
-  }
-
-  /**
-   * Checkout: Verify payment (handler for Express)
-   */
-  async checkoutVerifyPayment(req: any, res: any) {
-    try {
-      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-      const isValid = this.verifyPayment({ razorpay_order_id, razorpay_payment_id, razorpay_signature });
-      res.json({ success: true, data: { verified: isValid } });
-    } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message });
-    }
-  }
-
-  /**
-   * Booking: Create order wrapper
-   */
-  async createOrderHandler(req: any, res: any) {
-    try {
-      const { amount, receipt } = req.body;
-      const order = await this.createOrder(amount, receipt);
-      res.json({ success: true, data: order });
-    } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message });
-    }
-  }
-
-  /**
-   * Booking: Verify payment wrapper
-   */
-  async verifyPaymentHandler(req: any, res: any) {
-    try {
-      const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
-      const isValid = this.verifyPayment({ razorpay_order_id, razorpay_payment_id, razorpay_signature });
-      res.json({ success: true, data: { verified: isValid } });
-    } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message });
-    }
-  }
-
-  /**
-   * Get payment status
-   */
-  async getStatus(req: any, res: any) {
-    try {
-      const { paymentId } = req.params;
-      const payment = await this.getPaymentDetails(paymentId);
-      res.json({ success: true, data: payment });
-    } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message });
-    }
-  }
-
-  /**
-   * Refund payment
-   */
-  async refund(req: any, res: any) {
-    try {
-      const { paymentId, amount } = req.body;
-      const result = await this.refundPayment(paymentId, amount);
-      res.json({ success: true, data: result });
-    } catch (error: any) {
-      res.status(400).json({ success: false, message: error.message });
-    }
-  }
-
-  /**
-   * Generate unique booking ID - Format: BK-XXXX (4 alphanumeric chars)
-   */
-  private async generateBookingId(): Promise<string> {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let id = 'BK-';
-    let exists = true;
-    
-    while (exists) {
-      id = 'BK-';
-      for (let i = 0; i < 4; i++) {
-        id += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      
-      const booking = await Booking.findOne({ bookingId: id });
-      exists = booking !== null;
-    }
-    
-    return id;
-  }
-
-  /**
-   * Place Cash on Delivery Order
-   */
-  async placeCODOrder(req: any, res: any) {
-    try {
-      const { cartItems, shippingAddress, phone, firstName, lastName } = req.body;
-      const userId = req.userId;
-
-      console.log('📦 Processing COD Order:', {
-        userId,
-        itemCount: cartItems?.length || 0,
-        total: cartItems?.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0) || 0
-      });
-
-      // Validate cart items
-      if (!cartItems || cartItems.length === 0) {
-        return res.status(400).json({ success: false, message: 'Cart is empty' });
-      }
-
-      // Calculate total
-      const total = cartItems.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
-
-      // Create individual bookings for each item in cart
-      const bookings: any[] = [];
-      
-      for (const item of cartItems) {
-        try {
-          const bookingId = await this.generateBookingId();
-          const booking = new Booking({
-            bookingId,
-            userId,
-            productId: item.productId,
-            quantity: item.quantity,
-            totalPrice: item.price * item.quantity,
-            status: 'ready_for_delivery',
-            paymentStatus: 'pending',
-            paymentMethod: 'cod',
-            shippingAddress: {
-              street: shippingAddress || '',
-              city: '',
-              state: '',
-              zipCode: '',
-              country: 'India'
-            }
-          });
-
-          const savedBooking = await booking.save();
-          bookings.push(savedBooking);
-          console.log('✓ Booking created:', savedBooking.bookingId);
-        } catch (bookingError) {
-          console.error('⚠️ Error creating booking for item:', item.productId, bookingError);
-        }
-      }
-
-      // Get admin email from env
-      const adminEmail = process.env.ADMIN_EMAIL || process.env.MAIL_USER;
-      
-      // Get customer email from database
-      let customerEmail = '';
-      try {
-        const user = await User.findById(userId);
-        customerEmail = user?.email || '';
-      } catch (userError) {
-        console.error('⚠️ Error fetching user email:', userError);
-      }
-
-      // Get first booking's ID as main order ID
-      const mainBookingId = bookings[0]?.bookingId || `BK-ERROR`;
-
-      // Prepare order details for email
-      const orderDetails = {
-        orderId: mainBookingId,
-        customerName: `${firstName} ${lastName}`,
-        customerEmail,
-        phone,
-        address: shippingAddress,
-        total,
-        items: cartItems,
-        createdAt: new Date()
-      };
-
-      // Send confirmation email to customer
-      if (customerEmail) {
-        try {
-          await emailService.sendCODOrderConfirmation(
-            customerEmail,
-            `${firstName} ${lastName}`,
-            orderDetails
-          );
-          console.log('✓ Customer confirmation email sent to:', customerEmail);
-        } catch (emailError) {
-          console.error('⚠️  Failed to send customer email:', emailError);
-        }
-      }
-
-      // Send notification email to admin
-      if (adminEmail) {
-        try {
-          await emailService.sendCODOrderNotificationToAdmin(adminEmail, orderDetails);
-          console.log('✓ Admin notification email sent to:', adminEmail);
-        } catch (emailError) {
-          console.error('⚠️  Failed to send admin email:', emailError);
-        }
-      }
-
-      res.json({
-        success: true,
-        message: 'Order placed successfully!',
-        data: {
-          bookingId: mainBookingId,
-          orderId: mainBookingId,
-          total,
-          status: 'pending',
-          itemCount: cartItems.length
-        }
-      });
-
-    } catch (error: any) {
-      console.error('❌ COD Order Error:', error);
-      res.status(500).json({
-        success: false,
-        message: error.message || 'Failed to place COD order'
-      });
-    }
+  getKeySecret(): string {
+    return this.keySecret;
   }
 }
 
-// Export a single instance
-export default new PaymentService();
+const gateway = new RazorpayGateway();
+
+// ─────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────
+
+/**
+ * CRITICAL – Fetch fresh prices from the database.
+ * Never trust client-supplied prices.
+ */
+async function verifyAndPriceItems(cartItems: CartItemInput[]): Promise<{
+  items: VerifiedCartItem[];
+  totalAmount: number;
+}> {
+  if (!cartItems || cartItems.length === 0) {
+    throw new Error('Cart is empty.');
+  }
+
+  const items: VerifiedCartItem[] = [];
+  let totalAmount = 0;
+
+  for (const cartItem of cartItems) {
+    const { productId, quantity } = cartItem;
+
+    if (!productId || !quantity || quantity < 1) {
+      throw new Error(`Invalid cart item: productId=${productId}, quantity=${quantity}`);
+    }
+
+    // Fetch from DB – this is the authoritative price source
+    const productDoc = await productModel.findById(productId);
+    
+    if (!productDoc) {
+      console.error(`❌ Payment Error: Product not found in DB with ID: ${productId}`);
+      throw new Error(`Product not found: ${productId}`);
+    }
+
+    // CRITICAL: Convert to plain object to access fields NOT in the schema (like 'name' and 'price')
+    const product = productDoc.toObject();
+
+    // Parse price – stored as String or Number
+    const priceValue = product.productPrice || (product as any).price || (product as any).finalPrice;
+    const nameValue = product.productName || (product as any).name || 'Unknown Product';
+    const discountValue = product.productDiscount || (product as any).discountPercentage || 0;
+
+    const unitPrice = parseFloat(String(priceValue).replace(/[^0-9.]/g, ''));
+    if (isNaN(unitPrice) || unitPrice <= 0) {
+      console.error(`❌ Invalid price detected for product:`, nameValue, '| Raw Price:', priceValue);
+      throw new Error(`Invalid price for product: ${nameValue}`);
+    }
+
+    // Apply discount if available
+    let finalUnitPrice = unitPrice;
+    if (discountValue > 0) {
+      // If the field is discountPercentage (e.g. 10), we calculate it.
+      // If it's already the finalPrice, we use it directly.
+      if (priceValue === (product as any).finalPrice) {
+        finalUnitPrice = unitPrice;
+      } else {
+        finalUnitPrice = unitPrice - (unitPrice * discountValue) / 100;
+      }
+    }
+
+    finalUnitPrice = Math.round(finalUnitPrice * 100) / 100; // 2 dp
+    const lineTotal = finalUnitPrice * quantity;
+    totalAmount += lineTotal;
+
+    items.push({
+      productId: product._id as mongoose.Types.ObjectId,
+      productName: nameValue as string,
+      quantity,
+      price: finalUnitPrice,
+      image: (product.productImage as string[])?.[0] || (product as any).image,
+    });
+  }
+
+  return { items, totalAmount: Math.round(totalAmount * 100) / 100 };
+}
+
+/** HMAC-SHA256 signature verification – constant-time compare */
+function verifyRazorpaySignature(
+  orderId: string,
+  paymentId: string,
+  signature: string
+): boolean {
+  const payload = `${orderId}|${paymentId}`;
+  const expected = crypto
+    .createHmac('sha256', gateway.getKeySecret())
+    .update(payload)
+    .digest('hex');
+
+  // Constant-time comparison prevents timing attacks
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(signature));
+}
+
+/** Generate unique booking orderId */
+async function generateOrderId(): Promise<string> {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let orderId = '';
+  let exists = true;
+
+  while (exists) {
+    orderId = 'TWS-';
+    for (let i = 0; i < 8; i++) {
+      orderId += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    const booking = await Booking.findOne({ orderId });
+    exists = booking !== null;
+  }
+
+  return orderId;
+}
+
+// ─────────────────────────────────────────────
+// Route Handlers
+// ─────────────────────────────────────────────
+
+/**
+ * POST /api/payment/create-order
+ * 
+ * Step 1 of Razorpay flow.
+ * Frontend sends cartItems: [{ productId, quantity }].
+ * Backend fetches real prices, creates Razorpay order, returns orderId + amount.
+ */
+async function createRazorpayOrder(req: any, res: any) {
+  try {
+    const userId = req.userId;
+    const { cartItems, shippingAddress } = req.body as {
+      cartItems: CartItemInput[];
+      shippingAddress: VerifyPaymentBody['shippingAddress'];
+    };
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    if (!Array.isArray(cartItems) || cartItems.length === 0) {
+      return res.status(400).json({ success: false, message: 'Cart is empty' });
+    }
+
+    if (!shippingAddress?.name || !shippingAddress?.email || !shippingAddress?.phone ||
+        !shippingAddress?.street || !shippingAddress?.city || !shippingAddress?.state ||
+        !shippingAddress?.postalCode) {
+      return res.status(400).json({ success: false, message: 'Incomplete shipping address' });
+    }
+
+    // ── Server-side price verification ──────────────────────────────────────
+    const { items, totalAmount } = await verifyAndPriceItems(cartItems);
+
+    if (totalAmount <= 0) {
+      return res.status(400).json({ success: false, message: 'Invalid order amount' });
+    }
+
+    const amountInPaise = Math.round(totalAmount * 100); // Razorpay works in paise
+
+    // ── Create Razorpay order ────────────────────────────────────────────────
+    const receipt = `rcpt_${userId.toString().slice(-6)}_${Date.now()}`;
+
+    const rzpOrder = await (gateway.getInstance().orders.create({
+      amount: amountInPaise,
+      currency: 'INR',
+      receipt,
+      notes: {
+        userId: String(userId),
+        itemCount: String(items.length),
+        customerName: shippingAddress.name,
+        customerEmail: shippingAddress.email,
+      },
+    }) as any);
+
+  
+    return res.status(200).json({
+      success: true,
+      data: {
+        razorpayOrderId: rzpOrder.id,
+        amount: amountInPaise,            // in paise
+        currency: rzpOrder.currency,
+        keyId: gateway.getKeyId(),        // public key for frontend SDK
+        serverCalculatedTotal: totalAmount, // for display only
+        verifiedItems: items.map(i => ({
+          productName: i.productName,
+          quantity: i.quantity,
+          unitPrice: i.price,
+          lineTotal: i.price * i.quantity,
+        })),
+      },
+    });
+  } catch (err: any) {
+    console.error('❌ createRazorpayOrder error:', err);
+    if (err?.statusCode === 401) {
+      return res.status(400).json({ success: false, message: 'Invalid Razorpay credentials' });
+    }
+    return res.status(500).json({ success: false, message: err.message || 'Failed to create payment order' });
+  }
+}
+
+/**
+ * POST /api/payment/verify-and-book
+ *
+ * Step 2 of Razorpay flow.
+ * Backend:
+ *   1. Verifies HMAC signature cryptographically
+ *   2. Re-fetches prices from DB (second verification)
+ *   3. Creates booking record
+ *   4. Sends confirmation email
+ *
+ * Booking is ONLY created after verified payment – never before.
+ */
+async function verifyAndBook(req: any, res: any) {
+  try {
+    const userId = req.userId;
+    const {
+      razorpay_order_id,
+      razorpay_payment_id,
+      razorpay_signature,
+      cartItems,
+      shippingAddress,
+    } = req.body as VerifyPaymentBody;
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    // ── 1. Input validation ──────────────────────────────────────────────────
+    if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+      return res.status(400).json({
+        success: false,
+        message: 'Missing Razorpay payment parameters',
+      });
+    }
+
+    if (!Array.isArray(cartItems) || cartItems.length === 0) {
+      return res.status(400).json({ success: false, message: 'Cart is empty' });
+    }
+
+    if (!shippingAddress?.name || !shippingAddress?.email || !shippingAddress?.phone ||
+        !shippingAddress?.street || !shippingAddress?.city || !shippingAddress?.state ||
+        !shippingAddress?.postalCode) {
+      return res.status(400).json({ success: false, message: 'Incomplete shipping address' });
+    }
+
+    // ── 2. Cryptographic signature verification ──────────────────────────────
+    let isSignatureValid = false;
+    try {
+      isSignatureValid = verifyRazorpaySignature(
+        razorpay_order_id,
+        razorpay_payment_id,
+        razorpay_signature
+      );
+    } catch {
+      // Buffer length mismatch → tampered signature
+      isSignatureValid = false;
+    }
+
+    if (!isSignatureValid) {
+      console.warn(`⚠️  Signature verification FAILED for order: ${razorpay_order_id}`);
+      return res.status(400).json({
+        success: false,
+        message: 'Payment verification failed. Possible tampering detected.',
+      });
+    }
+
+    
+    // ── 3. Second server-side price recalculation ────────────────────────────
+    //      Even after signature check, re-verify prices from DB to protect
+    //      against any edge-case where signature matches but prices were wrong.
+    const { items, totalAmount } = await verifyAndPriceItems(cartItems);
+
+    // ── 4. Fetch Razorpay order to cross-check amount ────────────────────────
+    const rzpOrder = await (gateway.getInstance().orders.fetch(razorpay_order_id) as any);
+    const rzpAmountInRupees = Number(rzpOrder.amount) / 100;
+    const tolerance = 0.01; // 1 paise tolerance for floating point
+
+    if (Math.abs(rzpAmountInRupees - totalAmount) > tolerance) {
+      console.warn(
+        `⚠️  Amount mismatch! Razorpay: ₹${rzpAmountInRupees} | DB-calculated: ₹${totalAmount}`
+      );
+      return res.status(400).json({
+        success: false,
+        message: 'Payment amount mismatch. Order rejected for security.',
+      });
+    }
+
+    // ── 5. Prevent duplicate bookings for same payment ───────────────────────
+    const existingBooking = await Booking.findOne({ transactionId: razorpay_payment_id });
+    if (existingBooking) {
+      return res.status(409).json({
+        success: false,
+        message: 'Order already processed for this payment',
+      });
+    }
+
+    // ── 6. Get user info for email ───────────────────────────────────────────
+    const user = await User.findById(userId);
+    const customerEmail = user?.email || shippingAddress.email;
+
+    // ── 7. Create booking ────────────────────────────────────────────────────
+    const firstOrderId = await generateOrderId();
+
+    const booking = new Booking({
+      userId,
+      orderId: firstOrderId,
+      items,
+      totalAmount,
+      discountAmount: 0,
+      finalAmount: totalAmount,
+      deliveryAddress: {
+        name: shippingAddress.name,
+        email: shippingAddress.email,
+        phone: shippingAddress.phone,
+        street: shippingAddress.street,
+        city: shippingAddress.city,
+        state: shippingAddress.state,
+        postalCode: shippingAddress.postalCode,
+        country: shippingAddress.country || 'India',
+      },
+      paymentMethod: 'online',
+      paymentStatus: 'completed',
+      bookingStatus: 'confirmed',
+      transactionId: razorpay_payment_id,
+    });
+
+    await booking.save();
+    
+    // ── 8. Send confirmation emails (non-blocking) ───────────────────────────
+    const orderDetails = {
+      orderId: firstOrderId,
+      customerName: shippingAddress.name,
+      customerEmail,
+      phone: shippingAddress.phone,
+      address: `${shippingAddress.street}, ${shippingAddress.city}, ${shippingAddress.state} – ${shippingAddress.postalCode}`,
+      total: totalAmount,
+      paymentId: razorpay_payment_id,
+      items: items.map(i => ({
+        name: i.productName,
+        quantity: i.quantity,
+        price: i.price,
+      })),
+      createdAt: new Date(),
+    };
+
+    const adminEmail = process.env.ADMIN_EMAIL || process.env.MAIL_USER;
+
+    Promise.all([
+      customerEmail
+        ? emailService.sendOnlinePaymentConfirmation(customerEmail, shippingAddress.name, orderDetails)
+            .catch(e => console.error('⚠️  Customer email failed:', e))
+        : Promise.resolve(),
+      adminEmail
+        ? emailService.sendOnlinePaymentNotificationToAdmin(adminEmail, orderDetails)
+            .catch(e => console.error('⚠️  Admin email failed:', e))
+        : Promise.resolve(),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Payment verified and order placed successfully!',
+      data: {
+        orderId: firstOrderId,
+        bookingId: firstOrderId,
+        transactionId: razorpay_payment_id,
+        totalAmount,
+        status: 'confirmed',
+        itemCount: items.length,
+      },
+    });
+  } catch (err: any) {
+    console.error('❌ verifyAndBook error:', err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || 'Payment verification failed',
+    });
+  }
+}
+
+/**
+ * POST /api/payment/place-cod-order
+ *
+ * COD flow – server recalculates prices from DB before saving.
+ */
+async function placeCODOrder(req: any, res: any) {
+  try {
+    const userId = req.userId;
+    const { cartItems, shippingAddress } = req.body as {
+      cartItems: CartItemInput[];
+      shippingAddress: VerifyPaymentBody['shippingAddress'];
+    };
+
+    if (!userId) {
+      return res.status(401).json({ success: false, message: 'Unauthorized' });
+    }
+
+    if (!Array.isArray(cartItems) || cartItems.length === 0) {
+      return res.status(400).json({ success: false, message: 'Cart is empty' });
+    }
+
+    if (!shippingAddress?.name || !shippingAddress?.email || !shippingAddress?.phone ||
+        !shippingAddress?.street || !shippingAddress?.city || !shippingAddress?.state ||
+        !shippingAddress?.postalCode) {
+      return res.status(400).json({ success: false, message: 'Incomplete shipping address' });
+    }
+
+    // Server-side price verification
+    const { items, totalAmount } = await verifyAndPriceItems(cartItems);
+
+    const firstOrderId = await generateOrderId();
+
+    const booking = new Booking({
+      userId,
+      orderId: firstOrderId,
+      items,
+      totalAmount,
+      discountAmount: 0,
+      finalAmount: totalAmount,
+      deliveryAddress: {
+        name: shippingAddress.name,
+        email: shippingAddress.email,
+        phone: shippingAddress.phone,
+        street: shippingAddress.street,
+        city: shippingAddress.city,
+        state: shippingAddress.state,
+        postalCode: shippingAddress.postalCode,
+        country: shippingAddress.country || 'India',
+      },
+      paymentMethod: 'cod',
+      paymentStatus: 'pending',
+      bookingStatus: 'pending',
+    });
+
+    await booking.save();
+    
+    const user = await User.findById(userId);
+    const customerEmail = user?.email || shippingAddress.email;
+    const adminEmail = process.env.ADMIN_EMAIL || process.env.MAIL_USER;
+
+    const orderDetails = {
+      orderId: firstOrderId,
+      customerName: shippingAddress.name,
+      customerEmail,
+      phone: shippingAddress.phone,
+      address: `${shippingAddress.street}, ${shippingAddress.city}, ${shippingAddress.state} – ${shippingAddress.postalCode}`,
+      total: totalAmount,
+      items: items.map(i => ({
+        name: i.productName,
+        quantity: i.quantity,
+        price: i.price,
+      })),
+      createdAt: new Date(),
+    };
+
+    Promise.all([
+      customerEmail
+        ? emailService.sendCODOrderConfirmation(customerEmail, shippingAddress.name, orderDetails)
+            .catch(e => console.error('⚠️  Customer email failed:', e))
+        : Promise.resolve(),
+      adminEmail
+        ? emailService.sendCODOrderNotificationToAdmin(adminEmail, orderDetails)
+            .catch(e => console.error('⚠️  Admin email failed:', e))
+        : Promise.resolve(),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      message: 'COD order placed successfully!',
+      data: {
+        orderId: firstOrderId,
+        bookingId: firstOrderId,
+        totalAmount,
+        status: 'pending',
+        itemCount: items.length,
+      },
+    });
+  } catch (err: any) {
+    console.error('❌ placeCODOrder error:', err);
+    return res.status(500).json({
+      success: false,
+      message: err.message || 'Failed to place COD order',
+    });
+  }
+}
+
+/**
+ * GET /api/payment/status/:paymentId
+ */
+async function getPaymentStatus(req: any, res: any) {
+  try {
+    const { paymentId } = req.params;
+    const payment = await gateway.getInstance().payments.fetch(paymentId);
+    return res.status(200).json({ success: true, data: payment });
+  } catch (err: any) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+}
+
+/**
+ * POST /api/payment/refund  (admin only)
+ */
+async function refundPayment(req: any, res: any) {
+  try {
+    const { paymentId, amount } = req.body;
+    if (!paymentId) {
+      return res.status(400).json({ success: false, message: 'paymentId is required' });
+    }
+    const refund = await gateway.getInstance().payments.refund(paymentId, {
+      amount: amount ? Math.round(amount * 100) : undefined,
+    });
+    return res.status(200).json({
+      success: true,
+      data: {
+        refundId: refund.id,
+        status: refund.status,
+        amount: (refund.amount || 0) / 100,
+      },
+    });
+  } catch (err: any) {
+    return res.status(400).json({ success: false, message: err.message });
+  }
+}
+
+// ─────────────────────────────────────────────
+// Export handlers (bound-safe)
+// ─────────────────────────────────────────────
+export {
+  createRazorpayOrder,
+  verifyAndBook,
+  placeCODOrder,
+  getPaymentStatus,
+  refundPayment,
+};

@@ -15,10 +15,11 @@ export const generateDeliveryOtp = async (req: any, res: Response): Promise<any>
 
     // Allow OTP generation for shipped, ready_for_delivery, or pending bookings (for COD)
     const allowedStatuses = ['shipped', 'ready_for_delivery', 'pending'];
-    if (!allowedStatuses.includes(booking.status)) {
+    const currentStatus = booking.bookingStatus || (booking as any).status;
+    if (!allowedStatuses.includes(currentStatus)) {
       return res.status(400).json({ 
         success: false, 
-        message: `Cannot generate OTP for booking with status: ${booking.status}` 
+        message: `Cannot generate OTP for booking with status: ${currentStatus}` 
       });
     }
 
@@ -62,7 +63,7 @@ export const getBookingForDelivery = async (req: any, res: Response): Promise<an
 
     const booking = await Booking.findById(bookingId)
       .populate('userId', 'name phone email')
-      .populate('productId', 'name price');
+      .populate('items.productId', 'name price');
 
     if (!booking) {
       return res.status(404).json({ success: false, message: 'Booking not found' });
@@ -70,10 +71,11 @@ export const getBookingForDelivery = async (req: any, res: Response): Promise<an
 
     // Allow delivery for shipped, ready_for_delivery, or pending bookings (for COD)
     const allowedStatuses = ['shipped', 'ready_for_delivery', 'pending'];
-    if (!allowedStatuses.includes(booking.status)) {
+    const currentStatus = booking.bookingStatus || (booking as any).status;
+    if (!allowedStatuses.includes(currentStatus)) {
       return res.status(400).json({ 
         success: false, 
-        message: `Booking is not ready for delivery. Current status: ${booking.status}` 
+        message: `Booking is not ready for delivery. Current status: ${currentStatus}` 
       });
     }
 
@@ -81,13 +83,12 @@ export const getBookingForDelivery = async (req: any, res: Response): Promise<an
       success: true,
       booking: {
         _id: booking._id,
-        bookingId: booking.bookingId,
+        bookingId: booking.orderId || booking.bookingId,
         customer: booking.userId,
-        product: booking.productId,
-        quantity: booking.quantity,
-        totalPrice: booking.totalPrice,
-        shippingAddress: booking.shippingAddress,
-        status: booking.status
+        items: booking.items,
+        finalAmount: booking.finalAmount,
+        deliveryAddress: booking.deliveryAddress,
+        status: currentStatus
       }
     });
   } catch (error) {
@@ -120,10 +121,11 @@ export const confirmDeliveryWithOtp = async (req: any, res: Response): Promise<a
 
     // Allow delivery confirmation for shipped, ready_for_delivery, or pending bookings (for COD)
     const allowedStatuses = ['shipped', 'ready_for_delivery', 'pending'];
-    if (!allowedStatuses.includes(booking.status)) {
+    const currentStatus = booking.bookingStatus || (booking as any).status;
+    if (!allowedStatuses.includes(currentStatus)) {
       return res.status(400).json({ 
         success: false, 
-        message: `Cannot deliver booking with status: ${booking.status}` 
+        message: `Cannot deliver booking with status: ${currentStatus}` 
       });
     }
 
@@ -136,7 +138,7 @@ export const confirmDeliveryWithOtp = async (req: any, res: Response): Promise<a
     }
 
     // Update booking to delivered
-    booking.status = 'delivered';
+    booking.bookingStatus = 'delivered';
     booking.otpVerified = true;
     booking.deliveredDate = new Date();
     booking.deliveryBoyName = deliveryBoyName;
@@ -155,8 +157,8 @@ export const confirmDeliveryWithOtp = async (req: any, res: Response): Promise<a
       message: 'Delivery confirmed successfully',
       booking: {
         _id: booking._id,
-        bookingId: booking.bookingId,
-        status: booking.status,
+        bookingId: booking.orderId || booking.bookingId,
+        status: booking.bookingStatus,
         deliveredDate: booking.deliveredDate
       }
     });
@@ -181,8 +183,8 @@ export const searchBooking = async (req: any, res: Response): Promise<any> => {
       });
     }
 
-    const booking = await Booking.findOne({ bookingId: searchTerm })
-      .populate('productId', 'name price')
+    const booking = await Booking.findOne({ $or: [{ orderId: searchTerm }, { bookingId: searchTerm }] })
+      .populate('items.productId', 'name price')
       .populate('userId', 'name phone email address');
 
     if (!booking) {
@@ -195,10 +197,11 @@ export const searchBooking = async (req: any, res: Response): Promise<any> => {
     // Allow fetching bookings in pending, processing, or shipped status
     // Only prevent delivery for cancelled or delivered bookings
     const allowedStatuses = ['pending', 'processing', 'shipped', 'ready_for_delivery'];
-    if (!allowedStatuses.includes(booking.status)) {
+    const currentStatus = booking.bookingStatus || (booking as any).status;
+    if (!allowedStatuses.includes(currentStatus)) {
       return res.status(400).json({ 
         success: false, 
-        message: `Booking status is ${booking.status}, cannot be delivered` 
+        message: `Booking status is ${currentStatus}, cannot be delivered` 
       });
     }
 
@@ -206,13 +209,12 @@ export const searchBooking = async (req: any, res: Response): Promise<any> => {
       success: true,
       booking: {
         _id: booking._id,
-        bookingId: booking.bookingId,
-        status: booking.status,
-        totalPrice: booking.totalPrice,
-        quantity: booking.quantity,
-        product: booking.productId,
+        bookingId: booking.orderId || booking.bookingId,
+        status: currentStatus,
+        finalAmount: booking.finalAmount,
+        items: booking.items,
         customer: booking.userId,
-        shippingAddress: booking.shippingAddress
+        deliveryAddress: booking.deliveryAddress
       }
     });
   } catch (error) {
