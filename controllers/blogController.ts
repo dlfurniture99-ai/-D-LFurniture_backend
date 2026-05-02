@@ -18,9 +18,9 @@ export const blogController = {
       });
 
       await newBlog.save();
-      res.status(201).json({ success: true, message: 'Blog created successfully', blog: newBlog });
+      return res.status(201).json({ success: true, message: 'Blog created successfully', blog: newBlog });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   },
 
@@ -28,9 +28,9 @@ export const blogController = {
   async getAll(req: Request, res: Response) {
     try {
       const blogs = await Blog.find().sort({ createdAt: -1 });
-      res.status(200).json({ success: true, blogs });
+      return res.status(200).json({ success: true, blogs });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   },
 
@@ -39,9 +39,9 @@ export const blogController = {
     try {
       const blog = await Blog.findOne({ slug: req.params.slug });
       if (!blog) return res.status(404).json({ success: false, message: 'Blog not found' });
-      res.status(200).json({ success: true, blog });
+      return res.status(200).json({ success: true, blog });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   },
 
@@ -54,9 +54,9 @@ export const blogController = {
         { new: true, runValidators: true }
       );
       if (!updatedBlog) return res.status(404).json({ success: false, message: 'Blog not found' });
-      res.status(200).json({ success: true, message: 'Blog updated successfully', blog: updatedBlog });
+      return res.status(200).json({ success: true, message: 'Blog updated successfully', blog: updatedBlog });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   },
 
@@ -65,9 +65,9 @@ export const blogController = {
     try {
       const blog = await Blog.findByIdAndDelete(req.params.id);
       if (!blog) return res.status(404).json({ success: false, message: 'Blog not found' });
-      res.status(200).json({ success: true, message: 'Blog deleted successfully' });
+      return res.status(200).json({ success: true, message: 'Blog deleted successfully' });
     } catch (error: any) {
-      res.status(500).json({ success: false, message: error.message });
+      return res.status(500).json({ success: false, message: error.message });
     }
   }
 };

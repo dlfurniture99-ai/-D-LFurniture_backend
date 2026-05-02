@@ -42,9 +42,11 @@ router.post('/image', upload.single('image'), (req, res) => {
       success: true, 
       imageUrl: (req.file as any).path || (req.file as any).secure_url 
     });
+    return;
   } catch (error) {
     console.error('Upload Error:', error);
     res.status(500).json({ success: false, message: 'Upload failed' });
+    return;
   }
 });
 
