@@ -60,19 +60,7 @@ const ProductSchema = new Schema<IProduct>(
     },
     category: {
       type: String,
-      required: true,
-      enum: [
-        'Sofas & Couches',
-        'Chairs & Stools',
-        'Beds & Mattresses',
-        'Desks & Tables',
-        'Storage & Cabinets',
-        'Shelving & Units',
-        'Outdoor Furniture',
-        'Bedroom Furniture',
-        'Dining Furniture',
-        'Office Furniture'
-      ]
+      required: true
     },
     price: {
       type: Number,

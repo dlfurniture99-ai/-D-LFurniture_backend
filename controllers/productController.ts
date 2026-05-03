@@ -321,16 +321,28 @@ export const updateProduct = async (req: any, res: Response) => {
 // Admin: Delete product
 export const deleteProduct = async (req: Request, res: Response) => {
   try {
-    const product = await Product.findByIdAndDelete(req.params.id);
+    const { id } = req.params;
+    console.log('Attempting to delete product with ID:', id);
+    
+    const product = await Product.findByIdAndDelete(id);
+    
     if (!product) {
+      console.log('Product not found for deletion:', id);
       res.status(404).json({ success: false, message: 'Product not found' });
       return;
     }
+    
+    console.log('Product deleted successfully:', id);
     res.json({ success: true, message: 'Product deleted' });
-    } catch (error) {
-    res.status(500).json({ success: false, message: 'Failed to delete product' });
-    }
-    };
+  } catch (error: any) {
+    console.error('Error deleting product:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to delete product',
+      error: error.message 
+    });
+  }
+};
 
 // Admin: Toggle product visibility
 export const toggleProductVisibility = async (req: Request, res: Response) => {
